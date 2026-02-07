@@ -104,6 +104,16 @@ typedef struct {
 typedef struct AnkiRemoteApp AnkiRemoteApp; // Forward declaration
 
 // -----------------------------------------------------------------------------
+// View Models
+// -----------------------------------------------------------------------------
+// IMPORTANT: In the current GUI View system, draw callbacks receive the View *model*,
+// not the View context. We store a pointer to the app in each view model so draw
+// callbacks can safely access app state.
+typedef struct {
+    AnkiRemoteApp* app;
+} AnkiRemoteViewModel;
+
+// -----------------------------------------------------------------------------
 // HID Keyboard UI Data (mostly lifted from stock BLE Remote, just cleaner)
 // -----------------------------------------------------------------------------
 
@@ -807,7 +817,9 @@ static void anki_remote_send_key_combo(AnkiRemoteApp* app, KeyMapping mapping, b
 // -----------------------------------------------------------------------------
 
 static void anki_remote_view_menu_draw(Canvas* canvas, void* context) {
-    AnkiRemoteApp* app = context;
+    AnkiRemoteViewModel* model = context;
+    AnkiRemoteApp* app = model ? model->app : NULL;
+    if(!app) return;
     canvas_clear(canvas);
     canvas_set_font(canvas, FontPrimary);
     canvas_draw_str(canvas, 2, 12, "drgo.re's remote");
@@ -877,7 +889,9 @@ static void hid_keynote_draw_arrow(Canvas* canvas, uint8_t x, uint8_t y, CanvasD
 }
 
 static void anki_remote_view_controller_draw(Canvas* canvas, void* context) {
-    AnkiRemoteApp* app = context;
+    AnkiRemoteViewModel* model = context;
+    AnkiRemoteApp* app = model ? model->app : NULL;
+    if(!app) return;
     canvas_clear(canvas);
 
     // Defensive: some firmwares/builds may not swap the canvas dimensions as expected after
@@ -1217,7 +1231,9 @@ static bool anki_remote_view_controller_input(InputEvent* event, void* context) 
 // -----------------------------------------------------------------------------
 
 static void anki_remote_view_preset_manager_draw(Canvas* canvas, void* context) {
-    AnkiRemoteApp* app = context;
+    AnkiRemoteViewModel* model = context;
+    AnkiRemoteApp* app = model ? model->app : NULL;
+    if(!app) return;
     canvas_clear(canvas);
     canvas_set_font(canvas, FontPrimary);
     canvas_draw_str(canvas, 2, 10, "Manage Presets");
@@ -1391,7 +1407,9 @@ static void anki_remote_reset_keymap_only_for_preset(Preset* preset) {
 }
 
 static void anki_remote_view_preset_edit_menu_draw(Canvas* canvas, void* context) {
-    AnkiRemoteApp* app = context;
+    AnkiRemoteViewModel* model = context;
+    AnkiRemoteApp* app = model ? model->app : NULL;
+    if(!app) return;
     canvas_clear(canvas);
     canvas_set_font(canvas, FontPrimary);
     char header[40];
@@ -1606,7 +1624,9 @@ static void hid_keyboard_draw_key(
 }
 
 static void anki_remote_view_key_picker_draw(Canvas* canvas, void* context) {
-    AnkiRemoteApp* app = context;
+    AnkiRemoteViewModel* model = context;
+    AnkiRemoteApp* app = model ? model->app : NULL;
+    if(!app) return;
     canvas_clear(canvas);
     canvas_set_font(canvas, FontSecondary);
 
@@ -1897,37 +1917,52 @@ static AnkiRemoteApp* anki_remote_app_alloc() {
     // Menu View
     app->views[AnkiRemoteViewMenu] = view_alloc();
     view_set_context(app->views[AnkiRemoteViewMenu], app);
+    view_allocate_model(app->views[AnkiRemoteViewMenu], ViewModelTypeLockFree, sizeof(AnkiRemoteViewModel));
+    ((AnkiRemoteViewModel*)view_get_model(app->views[AnkiRemoteViewMenu]))->app = app;
     view_set_draw_callback(app->views[AnkiRemoteViewMenu], anki_remote_view_menu_draw);
     view_set_input_callback(app->views[AnkiRemoteViewMenu], anki_remote_view_menu_input);
+    view_commit_model(app->views[AnkiRemoteViewMenu], false);
     view_dispatcher_add_view(app->view_dispatcher, AnkiRemoteViewMenu, app->views[AnkiRemoteViewMenu]);
 
     // Controller View
     app->views[AnkiRemoteViewController] = view_alloc();
     view_set_context(app->views[AnkiRemoteViewController], app);
+    view_allocate_model(app->views[AnkiRemoteViewController], ViewModelTypeLockFree, sizeof(AnkiRemoteViewModel));
+    ((AnkiRemoteViewModel*)view_get_model(app->views[AnkiRemoteViewController]))->app = app;
     view_set_draw_callback(app->views[AnkiRemoteViewController], anki_remote_view_controller_draw);
     view_set_input_callback(app->views[AnkiRemoteViewController], anki_remote_view_controller_input);
     view_set_orientation(app->views[AnkiRemoteViewController], ViewOrientationVerticalFlip);
+    view_commit_model(app->views[AnkiRemoteViewController], false);
     view_dispatcher_add_view(app->view_dispatcher, AnkiRemoteViewController, app->views[AnkiRemoteViewController]);
 
     // Preset Manager View
     app->views[AnkiRemoteViewPresetManager] = view_alloc();
     view_set_context(app->views[AnkiRemoteViewPresetManager], app);
+    view_allocate_model(app->views[AnkiRemoteViewPresetManager], ViewModelTypeLockFree, sizeof(AnkiRemoteViewModel));
+    ((AnkiRemoteViewModel*)view_get_model(app->views[AnkiRemoteViewPresetManager]))->app = app;
     view_set_draw_callback(app->views[AnkiRemoteViewPresetManager], anki_remote_view_preset_manager_draw);
     view_set_input_callback(app->views[AnkiRemoteViewPresetManager], anki_remote_view_preset_manager_input);
+    view_commit_model(app->views[AnkiRemoteViewPresetManager], false);
     view_dispatcher_add_view(app->view_dispatcher, AnkiRemoteViewPresetManager, app->views[AnkiRemoteViewPresetManager]);
 
     // Preset Edit Menu View
     app->views[AnkiRemoteViewPresetEditMenu] = view_alloc();
     view_set_context(app->views[AnkiRemoteViewPresetEditMenu], app);
+    view_allocate_model(app->views[AnkiRemoteViewPresetEditMenu], ViewModelTypeLockFree, sizeof(AnkiRemoteViewModel));
+    ((AnkiRemoteViewModel*)view_get_model(app->views[AnkiRemoteViewPresetEditMenu]))->app = app;
     view_set_draw_callback(app->views[AnkiRemoteViewPresetEditMenu], anki_remote_view_preset_edit_menu_draw);
     view_set_input_callback(app->views[AnkiRemoteViewPresetEditMenu], anki_remote_view_preset_edit_menu_input);
+    view_commit_model(app->views[AnkiRemoteViewPresetEditMenu], false);
     view_dispatcher_add_view(app->view_dispatcher, AnkiRemoteViewPresetEditMenu, app->views[AnkiRemoteViewPresetEditMenu]);
 
     // Key Picker View
     app->views[AnkiRemoteViewKeyPicker] = view_alloc();
     view_set_context(app->views[AnkiRemoteViewKeyPicker], app);
+    view_allocate_model(app->views[AnkiRemoteViewKeyPicker], ViewModelTypeLockFree, sizeof(AnkiRemoteViewModel));
+    ((AnkiRemoteViewModel*)view_get_model(app->views[AnkiRemoteViewKeyPicker]))->app = app;
     view_set_draw_callback(app->views[AnkiRemoteViewKeyPicker], anki_remote_view_key_picker_draw);
     view_set_input_callback(app->views[AnkiRemoteViewKeyPicker], anki_remote_view_key_picker_input);
+    view_commit_model(app->views[AnkiRemoteViewKeyPicker], false);
     view_dispatcher_add_view(app->view_dispatcher, AnkiRemoteViewKeyPicker, app->views[AnkiRemoteViewKeyPicker]);
 
     // Allocate TextInput (for rename)
