@@ -303,7 +303,7 @@ static bool anki_remote_view_key_picker_input(InputEvent* event, void* context);
 static void anki_remote_connection_status_callback(BtStatus status, void* context);
 static void anki_remote_switch_to_view(AnkiRemoteApp* app, AnkiRemoteView view);
 static void anki_remote_send_key_combo(AnkiRemoteApp* app, KeyMapping mapping, bool is_press);
-static const char* get_button_name(FlipperButton button);
+static const char* get_button_name_oriented(const AnkiRemoteApp* app, FlipperButton button);
 static void get_key_combo_name(KeyMapping mapping, char* buffer, size_t buffer_size);
 static void anki_remote_reset_keymap_only_for_preset(Preset* preset);
 static void preset_rename_result_cb(void* context);
@@ -525,7 +525,31 @@ static bool anki_remote_load_presets(AnkiRemoteApp* app) {
 // Label & Name Helpers
 // -----------------------------------------------------------------------------
 
-static const char* get_button_name(FlipperButton button) {
+static const char* get_button_name_oriented(const AnkiRemoteApp* app, FlipperButton button) {
+    const bool use_vertical_names = app != NULL;
+    if(use_vertical_names) {
+        // ViewOrientationVerticalFlip remaps physical -> logical:
+        // physical Up -> logical Left, physical Down -> logical Right,
+        // physical Right -> logical Up, physical Left -> logical Down.
+        // We invert that mapping so labels match how the remote is held vertically.
+        switch(button) {
+        case FlipperButtonUp:
+            return "Right";
+        case FlipperButtonDown:
+            return "Left";
+        case FlipperButtonLeft:
+            return "Up";
+        case FlipperButtonRight:
+            return "Down";
+        case FlipperButtonOk:
+            return "OK";
+        case FlipperButtonBack:
+            return "Back";
+        default:
+            return "??";
+        }
+    }
+
     switch(button) {
     case FlipperButtonUp:
         return "Up";
@@ -1460,7 +1484,13 @@ static void anki_remote_view_preset_edit_menu_draw(Canvas* canvas, void* context
             }
 
             // Format: "Btn: short/long"
-            snprintf(label, sizeof(label), "%s: %s/%s", get_button_name(item_index), short_buf, long_buf);
+            snprintf(
+                label,
+                sizeof(label),
+                "%s: %s/%s",
+                get_button_name_oriented(app, item_index),
+                short_buf,
+                long_buf);
         } else {
             strlcpy(label, "Reset Mappings", sizeof(label));
         }
@@ -1643,7 +1673,7 @@ static void anki_remote_view_key_picker_draw(Canvas* canvas, void* context) {
         header_str,
         sizeof(header_str),
         "%s: %s (%s) [%s]",
-        get_button_name(app->settings_state.configuring_button),
+        get_button_name_oriented(app, app->settings_state.configuring_button),
         app->settings_state.editing_long_press ? "LONG" : "SHORT",
         app->presets[app->settings_state.editing_preset_index].name,
         app->settings_state.editing_long_press ? "hold OK" : "hold OK");
