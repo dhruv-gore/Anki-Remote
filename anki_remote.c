@@ -893,71 +893,69 @@ static void anki_remote_scene_controller_draw_callback(Canvas* canvas, void* con
         canvas_set_font(canvas, FontSecondary);
         canvas_draw_str(canvas, 48, 37, "Awaiting bluetooth");
     } else {
-        // Controller screen
-        canvas_draw_icon(canvas, 0, 2, &I_Pin_back_arrow_10x8);
-        canvas_set_font(canvas, FontPrimary);
-        canvas_draw_str(canvas, 17, 10, "Hold to exit");
-        // Show active preset name in top-right
+        // Controller screen (Portrait Mode - Rotated 90 CW)
+        
+        // Visual Up (Physical Left) - Drawn on Left side (X=5) pointing Left
+        canvas_draw_icon(canvas, 5, 23, &I_Button_18x18);
+        if(app->controller_state.left_pressed) {
+            elements_slightly_rounded_box(canvas, 8, 25, 13, 13);
+            canvas_set_color(canvas, ColorWhite);
+        }
+        hid_keynote_draw_arrow(canvas, 12, 32, CanvasDirectionRightToLeft);
+        canvas_set_color(canvas, ColorBlack);
+
+        // Visual Down (Physical Right) - Drawn on Right side (X=45) pointing Right
+        canvas_draw_icon(canvas, 45, 23, &I_Button_18x18);
+        if(app->controller_state.right_pressed) {
+            elements_slightly_rounded_box(canvas, 48, 25, 13, 13);
+            canvas_set_color(canvas, ColorWhite);
+        }
+        hid_keynote_draw_arrow(canvas, 54, 32, CanvasDirectionLeftToRight);
+        canvas_set_color(canvas, ColorBlack);
+
+        // Visual Left (Physical Down) - Drawn on Bottom (Y=43) pointing Down
+        canvas_draw_icon(canvas, 25, 43, &I_Button_18x18);
+        if(app->controller_state.down_pressed) {
+            elements_slightly_rounded_box(canvas, 28, 45, 13, 13);
+            canvas_set_color(canvas, ColorWhite);
+        }
+        hid_keynote_draw_arrow(canvas, 34, 53, CanvasDirectionTopToBottom);
+        canvas_set_color(canvas, ColorBlack);
+
+        // Visual Right (Physical Up) - Drawn on Top (Y=3) pointing Up
+        canvas_draw_icon(canvas, 25, 3, &I_Button_18x18);
+        if(app->controller_state.up_pressed) {
+            elements_slightly_rounded_box(canvas, 28, 5, 13, 13);
+            canvas_set_color(canvas, ColorWhite);
+        }
+        hid_keynote_draw_arrow(canvas, 34, 9, CanvasDirectionBottomToTop);
+        canvas_set_color(canvas, ColorBlack);
+
+        // OK Button (Physical OK) - Placed in the remaining space
+        canvas_draw_icon(canvas, 75, 15, &I_Button_18x18);
+        if(app->controller_state.ok_pressed) {
+             elements_slightly_rounded_box(canvas, 78, 17, 13, 13);
+             canvas_set_color(canvas, ColorWhite);
+        }
+        canvas_draw_icon(canvas, 80, 20, &I_Ok_btn_9x9);
+        canvas_set_color(canvas, ColorBlack);
+        
+        // Back Button (Physical Back)
+        canvas_draw_icon(canvas, 75, 40, &I_Button_18x18);
+        if(app->controller_state.back_pressed) {
+             elements_slightly_rounded_box(canvas, 78, 42, 13, 13);
+             canvas_set_color(canvas, ColorWhite);
+        }
+        canvas_draw_icon(canvas, 79, 45, &I_Pin_back_arrow_10x8);
+        canvas_set_color(canvas, ColorBlack);
+
+        // Show preset name
         canvas_set_font(canvas, FontSecondary);
         char title_buf[32];
-        snprintf(title_buf, sizeof(title_buf), "[%s]", app->presets[app->active_preset].name);
-        elements_multiline_text_aligned(canvas, 127, 3, AlignRight, AlignTop, title_buf);
-
-        // D-Pad Up
-        canvas_draw_icon(canvas, 21, 24, &I_Button_18x18);
-        if(app->controller_state.up_pressed) {
-            elements_slightly_rounded_box(canvas, 24, 26, 13, 13);
-            canvas_set_color(canvas, ColorWhite);
-        }
-        hid_keynote_draw_arrow(canvas, 30, 30, CanvasDirectionBottomToTop);
-        canvas_set_color(canvas, ColorBlack);
-
-        // D-Pad Down
-        canvas_draw_icon(canvas, 21, 45, &I_Button_18x18);
-        if(app->controller_state.down_pressed) {
-            elements_slightly_rounded_box(canvas, 24, 47, 13, 13);
-            canvas_set_color(canvas, ColorWhite);
-        }
-        hid_keynote_draw_arrow(canvas, 30, 55, CanvasDirectionTopToBottom);
-        canvas_set_color(canvas, ColorBlack);
-
-        // D-Pad Left
-        canvas_draw_icon(canvas, 0, 45, &I_Button_18x18);
-        if(app->controller_state.left_pressed) {
-            elements_slightly_rounded_box(canvas, 3, 47, 13, 13);
-            canvas_set_color(canvas, ColorWhite);
-        }
-        hid_keynote_draw_arrow(canvas, 7, 53, CanvasDirectionRightToLeft);
-        canvas_set_color(canvas, ColorBlack);
-
-        // D-Pad Right
-        canvas_draw_icon(canvas, 42, 45, &I_Button_18x18);
-        if(app->controller_state.right_pressed) {
-            elements_slightly_rounded_box(canvas, 45, 47, 13, 13);
-            canvas_set_color(canvas, ColorWhite);
-        }
-        hid_keynote_draw_arrow(canvas, 53, 53, CanvasDirectionLeftToRight);
-        canvas_set_color(canvas, ColorBlack);
-
-        // OK row
-        canvas_draw_icon(canvas, 63, 24, &I_Space_65x18);
-        if(app->controller_state.ok_pressed) {
-            elements_slightly_rounded_box(canvas, 66, 26, 60, 13);
-            canvas_set_color(canvas, ColorWhite);
-        }
-        canvas_draw_icon(canvas, 74, 28, &I_Ok_btn_9x9);
-        elements_multiline_text_aligned(canvas, 91, 36, AlignLeft, AlignBottom, "OK");
-        canvas_set_color(canvas, ColorBlack);
-
-        // Back row
-        canvas_draw_icon(canvas, 63, 45, &I_Space_65x18);
-        if(app->controller_state.back_pressed) {
-            elements_slightly_rounded_box(canvas, 66, 47, 60, 13);
-            canvas_set_color(canvas, ColorWhite);
-        }
-        canvas_draw_icon(canvas, 74, 49, &I_Pin_back_arrow_10x8);
-        elements_multiline_text_aligned(canvas, 91, 57, AlignLeft, AlignBottom, "Back");
-        canvas_set_color(canvas, ColorBlack);
+        snprintf(title_buf, sizeof(title_buf), "%s", app->presets[app->active_preset].name);
+        // Truncate to avoid overflow
+        if(strlen(title_buf) > 6) title_buf[6] = '\0'; 
+        canvas_draw_str(canvas, 100, 35, title_buf);
     }
 }
 
