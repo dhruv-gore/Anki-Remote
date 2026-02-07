@@ -34,7 +34,7 @@
 #define PRESETS_PATH APP_DATA_PATH("presets.dat") // New presets file
 
 #define NUM_FLIPPER_BUTTONS 6
-#define MENU_OPTIONS_COUNT 2
+#define MENU_OPTIONS_COUNT 3 // Start, Manage Presets, Save Profile
 
 // This is so it can use the same bluetooth keys as other HID apps
 #define HID_BT_KEYS_STORAGE_PATH EXT_PATH("apps_data/hid_ble/.bt_hid.keys")
@@ -87,9 +87,12 @@ typedef struct {
 } AnkiRemoteEvent;
 
 // Key combination: a single HID key + our modifier bitmask
+// Now supports both short and long press mappings
 typedef struct {
-    uint8_t keycode;
-    uint8_t modifiers;
+    uint8_t keycode;       // short press key
+    uint8_t modifiers;     // short press modifiers
+    uint8_t long_keycode;  // long press key
+    uint8_t long_modifiers;// long press modifiers
 } KeyMapping;
 
 // A single preset: name + one mapping per Flipper button
@@ -221,6 +224,20 @@ struct AnkiRemoteApp {
         bool right_pressed;
         bool ok_pressed;
         bool back_pressed;
+        // Track if long press was already sent (to avoid sending short press too)
+        bool up_long_sent;
+        bool down_long_sent;
+        bool left_long_sent;
+        bool right_long_sent;
+        bool ok_long_sent;
+        bool back_long_sent;
+        // Track the long press mapping so we can release it properly
+        KeyMapping up_long_mapping;
+        KeyMapping down_long_mapping;
+        KeyMapping left_long_mapping;
+        KeyMapping right_long_mapping;
+        KeyMapping ok_long_mapping;
+        KeyMapping back_long_mapping;
     } controller_state;
 
     // Key picker state
@@ -232,6 +249,7 @@ struct AnkiRemoteApp {
         bool gui_pressed;
         FlipperButton configuring_button;
         uint8_t editing_preset_index;
+        bool editing_long_press; // true = editing long press, false = editing short press
     } settings_state;
 
     // Rename buffer
@@ -262,7 +280,7 @@ static void preset_rename_result_cb(void* context);
 
 typedef struct {
     uint32_t magic;        // 'ARPM'
-    uint16_t version;      // 0x0001
+    uint16_t version;      // 0x0002
     uint8_t preset_count;
     uint8_t active_index;
     uint8_t led_brightness;
@@ -270,7 +288,7 @@ typedef struct {
 } PresetFileHeader;
 
 #define PRESET_FILE_MAGIC 0x4152504DUL // 'ARPM'
-#define PRESET_FILE_VERSION 0x0001
+#define PRESET_FILE_VERSION 0x0002 // Long press support
 
 // -----------------------------------------------------------------------------
 // Small Helpers
@@ -279,6 +297,8 @@ typedef struct {
 static void keymap_clear(KeyMapping* km) {
     km->keycode = 0;
     km->modifiers = 0;
+    km->long_keycode = 0;
+    km->long_modifiers = 0;
 }
 
 static void preset_init_empty(Preset* p, const char* name) {
@@ -298,6 +318,46 @@ static void anki_remote_set_default_presets(AnkiRemoteApp* app) {
     app->active_preset = 0;
     app->led_brightness = 255;
     preset_init_empty(&app->presets[0], "Default");
+
+    // Set default key mappings as specified by user:
+    // (remapped based on actual button behavior - buttons are shifted)
+    // Updated: Down gets Left's old mapping, Left/Right swapped
+
+    // Right (physically Left position): gets Down's old mapping: short='-', long='Up'
+    app->presets[0].keymap[FlipperButtonRight].keycode = HID_KEYBOARD_MINUS;
+    app->presets[0].keymap[FlipperButtonRight].modifiers = 0;
+    app->presets[0].keymap[FlipperButtonRight].long_keycode = HID_KEYBOARD_UP_ARROW;
+    app->presets[0].keymap[FlipperButtonRight].long_modifiers = 0;
+
+    // Left (physically Down): gets Right's old mapping: short='1', long='Down'
+    app->presets[0].keymap[FlipperButtonLeft].keycode = HID_KEYBOARD_1;
+    app->presets[0].keymap[FlipperButtonLeft].modifiers = 0;
+    app->presets[0].keymap[FlipperButtonLeft].long_keycode = HID_KEYBOARD_DOWN_ARROW;
+    app->presets[0].keymap[FlipperButtonLeft].long_modifiers = 0;
+
+    // Down (physically Right): short='n', long='d'
+    app->presets[0].keymap[FlipperButtonDown].keycode = HID_KEYBOARD_N;
+    app->presets[0].keymap[FlipperButtonDown].modifiers = 0;
+    app->presets[0].keymap[FlipperButtonDown].long_keycode = HID_KEYBOARD_D;
+    app->presets[0].keymap[FlipperButtonDown].long_modifiers = 0;
+
+    // OK (middle): short='Enter', long='y'
+    app->presets[0].keymap[FlipperButtonOk].keycode = HID_KEYBOARD_RETURN;
+    app->presets[0].keymap[FlipperButtonOk].modifiers = 0;
+    app->presets[0].keymap[FlipperButtonOk].long_keycode = HID_KEYBOARD_Y;
+    app->presets[0].keymap[FlipperButtonOk].long_modifiers = 0;
+
+    // Up: short='undo' (Cmd+Z for Mac), long='shift 2' (@)
+    app->presets[0].keymap[FlipperButtonUp].keycode = HID_KEYBOARD_Z;
+    app->presets[0].keymap[FlipperButtonUp].modifiers = MOD_GUI_BIT;
+    app->presets[0].keymap[FlipperButtonUp].long_keycode = HID_KEYBOARD_2;
+    app->presets[0].keymap[FlipperButtonUp].long_modifiers = MOD_SHIFT_BIT;
+
+    // Back: short='s', long unmapped
+    app->presets[0].keymap[FlipperButtonBack].keycode = HID_KEYBOARD_S;
+    app->presets[0].keymap[FlipperButtonBack].modifiers = 0;
+    app->presets[0].keymap[FlipperButtonBack].long_keycode = 0;
+    app->presets[0].keymap[FlipperButtonBack].long_modifiers = 0;
 }
 
 // We save everything in one file
@@ -325,6 +385,7 @@ static void anki_remote_save_presets(AnkiRemoteApp* app) {
 
 // Migration path from older single-keymap file into presets file.
 // Reads once, converts to preset 0, and saves in new format.
+// Handles migration from v0x0001 (short press only) to v0x0002 (short + long press).
 static bool anki_remote_load_presets(AnkiRemoteApp* app) {
     bool loaded = false;
     Storage* storage = furi_record_open(RECORD_STORAGE);
@@ -332,17 +393,50 @@ static bool anki_remote_load_presets(AnkiRemoteApp* app) {
     if(storage_file_open(file, PRESETS_PATH, FSAM_READ, FSOM_OPEN_EXISTING)) {
         PresetFileHeader hdr = {0};
         if(storage_file_read(file, &hdr, sizeof(hdr)) == sizeof(hdr) &&
-           hdr.magic == PRESET_FILE_MAGIC && hdr.version == PRESET_FILE_VERSION &&
-           hdr.preset_count >= 1 && hdr.preset_count <= MAX_PRESETS) {
+           hdr.magic == PRESET_FILE_MAGIC && hdr.preset_count >= 1 && hdr.preset_count <= MAX_PRESETS) {
             app->preset_count = hdr.preset_count;
             app->active_preset = (hdr.active_index < app->preset_count) ? hdr.active_index : 0;
             app->led_brightness = hdr.led_brightness ? hdr.led_brightness : 255;
-            for(uint8_t i = 0; i < app->preset_count; ++i) {
-                storage_file_read(file, app->presets[i].name, PRESET_NAME_MAX_LEN + 1);
-                storage_file_read(file, app->presets[i].keymap, sizeof(KeyMapping) * NUM_FLIPPER_BUTTONS);
-                app->presets[i].name[PRESET_NAME_MAX_LEN] = '\0';
+
+            // Check version for backward compatibility
+            bool needs_save = false;
+            if(hdr.version == 0x0001) {
+                // Old format: KeyMapping was 2 bytes (keycode + modifiers)
+                // Need to migrate to 4 bytes (adding long_keycode + long_modifiers)
+                typedef struct {
+                    uint8_t keycode;
+                    uint8_t modifiers;
+                } OldKeyMapping;
+                OldKeyMapping old_keymap[NUM_FLIPPER_BUTTONS];
+
+                for(uint8_t i = 0; i < app->preset_count; ++i) {
+                    storage_file_read(file, app->presets[i].name, PRESET_NAME_MAX_LEN + 1);
+                    app->presets[i].name[PRESET_NAME_MAX_LEN] = '\0';
+                    storage_file_read(file, old_keymap, sizeof(OldKeyMapping) * NUM_FLIPPER_BUTTONS);
+                    // Migrate to new format: copy short press, clear long press
+                    for(uint8_t j = 0; j < NUM_FLIPPER_BUTTONS; ++j) {
+                        app->presets[i].keymap[j].keycode = old_keymap[j].keycode;
+                        app->presets[i].keymap[j].modifiers = old_keymap[j].modifiers;
+                        app->presets[i].keymap[j].long_keycode = 0;
+                        app->presets[i].keymap[j].long_modifiers = 0;
+                    }
+                }
+                needs_save = true;
+            } else if(hdr.version == 0x0002) {
+                // Current format: v2 with long press support
+                for(uint8_t i = 0; i < app->preset_count; ++i) {
+                    storage_file_read(file, app->presets[i].name, PRESET_NAME_MAX_LEN + 1);
+                    storage_file_read(file, app->presets[i].keymap, sizeof(KeyMapping) * NUM_FLIPPER_BUTTONS);
+                    app->presets[i].name[PRESET_NAME_MAX_LEN] = '\0';
+                }
+            } else {
+                // Unknown version - treat as corrupt and use defaults
+                loaded = false;
             }
-            loaded = true;
+            if(loaded || needs_save) {
+                loaded = true;
+                if(needs_save) anki_remote_save_presets(app);
+            }
         }
     }
     storage_file_close(file);
@@ -355,7 +449,11 @@ static bool anki_remote_load_presets(AnkiRemoteApp* app) {
     storage = furi_record_open(RECORD_STORAGE);
     file = storage_file_alloc(storage);
     if(storage_file_open(file, KEYMAP_PATH, FSAM_READ, FSOM_OPEN_EXISTING)) {
-        KeyMapping legacy_map[NUM_FLIPPER_BUTTONS];
+        typedef struct {
+            uint8_t keycode;
+            uint8_t modifiers;
+        } OldKeyMapping;
+        OldKeyMapping legacy_map[NUM_FLIPPER_BUTTONS];
         uint8_t brightness = 255;
         if(storage_file_read(file, legacy_map, sizeof(legacy_map)) == sizeof(legacy_map)) {
             // brightness might be present
@@ -363,7 +461,13 @@ static bool anki_remote_load_presets(AnkiRemoteApp* app) {
                 brightness = 255;
             }
             anki_remote_set_default_presets(app);
-            memcpy(app->presets[0].keymap, legacy_map, sizeof(legacy_map));
+            // Migrate old keymap to new format
+            for(uint8_t j = 0; j < NUM_FLIPPER_BUTTONS; ++j) {
+                app->presets[0].keymap[j].keycode = legacy_map[j].keycode;
+                app->presets[0].keymap[j].modifiers = legacy_map[j].modifiers;
+                app->presets[0].keymap[j].long_keycode = 0;
+                app->presets[0].keymap[j].long_modifiers = 0;
+            }
             app->led_brightness = brightness;
             loaded = true;
             // Save into new format
@@ -719,7 +823,7 @@ static void anki_remote_scene_menu_draw_callback(Canvas* canvas, void* context) 
     AnkiRemoteApp* app = context;
     canvas_clear(canvas);
     canvas_set_font(canvas, FontPrimary);
-    canvas_draw_str(canvas, 2, 12, "Custom BLE Remote");
+    canvas_draw_str(canvas, 2, 12, "drgo.re's remote");
     canvas_set_font(canvas, FontSecondary);
     for(uint8_t i = 0; i < MENU_OPTIONS_COUNT; ++i) {
         if(i == app->menu_state.selected_item) {
@@ -728,10 +832,9 @@ static void anki_remote_scene_menu_draw_callback(Canvas* canvas, void* context) 
         }
         if(i == 0) canvas_draw_str(canvas, 15, 33, "Start");
         if(i == 1) canvas_draw_str(canvas, 15, 48, "Manage Presets");
+        if(i == 2) canvas_draw_str(canvas, 15, 63, "Save as Profile");
         canvas_set_color(canvas, ColorBlack);
     }
-    elements_multiline_text_aligned(
-        canvas, 64, 62, AlignCenter, AlignBottom, "Created by @blue5gd");
 }
 
 static void anki_remote_scene_menu_input_handler(AnkiRemoteApp* app, InputEvent* event) {
@@ -742,8 +845,24 @@ static void anki_remote_scene_menu_input_handler(AnkiRemoteApp* app, InputEvent*
     } else if(event->key == InputKeyDown) {
         app->menu_state.selected_item = (app->menu_state.selected_item + 1) % MENU_OPTIONS_COUNT;
     } else if(event->key == InputKeyOk) {
-        if(app->menu_state.selected_item == 0) anki_remote_set_scene(app, SceneController); // Start
-        else if(app->menu_state.selected_item == 1) anki_remote_set_scene(app, ScenePresetManager); // Manage Presets
+        if(app->menu_state.selected_item == 0) {
+            anki_remote_set_scene(app, SceneController); // Start
+        } else if(app->menu_state.selected_item == 1) {
+            anki_remote_set_scene(app, ScenePresetManager); // Manage Presets
+        } else if(app->menu_state.selected_item == 2) {
+            // Save as Profile - duplicate current preset to new slot
+            if(app->preset_count < MAX_PRESETS) {
+                // Duplicate active preset to new slot
+                uint8_t new_idx = app->preset_count;
+                app->presets[new_idx] = app->presets[app->active_preset];
+                // Use a temp buffer to avoid overlap warning
+                char temp_name[PRESET_NAME_MAX_LEN + 1];
+                snprintf(temp_name, sizeof(temp_name), "%s_copy", app->presets[app->active_preset].name);
+                strlcpy(app->presets[new_idx].name, temp_name, PRESET_NAME_MAX_LEN + 1);
+                app->preset_count++;
+                anki_remote_save_presets(app);
+            }
+        }
     } else if(event->key == InputKeyBack && event->type == InputTypeShort) {
         app->running = false;
     }
@@ -850,43 +969,163 @@ static void anki_remote_scene_controller_input_handler(AnkiRemoteApp* app, Input
             return;
         }
     }
-    bool is_press = (event->type == InputTypePress);
-    bool is_release = (event->type == InputTypeRelease);
-    if(is_press || is_release) {
-        KeyMapping mapping = (KeyMapping){0};
+
+    // Handle long press - send long press key press (hold) and store for release
+    if(event->type == InputTypeLong) {
+        KeyMapping long_mapping = (KeyMapping){0};
+        bool* long_sent_ptr = NULL;
+        KeyMapping* long_mapping_ptr = NULL;
         bool key_event = true;
         switch(event->key) {
         case InputKeyUp:
-            app->controller_state.up_pressed = is_press;
-            mapping = app->presets[app->active_preset].keymap[FlipperButtonUp];
+            long_mapping = app->presets[app->active_preset].keymap[FlipperButtonUp];
+            long_sent_ptr = &app->controller_state.up_long_sent;
+            long_mapping_ptr = &app->controller_state.up_long_mapping;
             break;
         case InputKeyDown:
-            app->controller_state.down_pressed = is_press;
-            mapping = app->presets[app->active_preset].keymap[FlipperButtonDown];
+            long_mapping = app->presets[app->active_preset].keymap[FlipperButtonDown];
+            long_sent_ptr = &app->controller_state.down_long_sent;
+            long_mapping_ptr = &app->controller_state.down_long_mapping;
             break;
         case InputKeyLeft:
-            app->controller_state.left_pressed = is_press;
-            mapping = app->presets[app->active_preset].keymap[FlipperButtonLeft];
+            long_mapping = app->presets[app->active_preset].keymap[FlipperButtonLeft];
+            long_sent_ptr = &app->controller_state.left_long_sent;
+            long_mapping_ptr = &app->controller_state.left_long_mapping;
             break;
         case InputKeyRight:
-            app->controller_state.right_pressed = is_press;
-            mapping = app->presets[app->active_preset].keymap[FlipperButtonRight];
+            long_mapping = app->presets[app->active_preset].keymap[FlipperButtonRight];
+            long_sent_ptr = &app->controller_state.right_long_sent;
+            long_mapping_ptr = &app->controller_state.right_long_mapping;
             break;
         case InputKeyOk:
-            app->controller_state.ok_pressed = is_press;
-            mapping = app->presets[app->active_preset].keymap[FlipperButtonOk];
+            long_mapping = app->presets[app->active_preset].keymap[FlipperButtonOk];
+            long_sent_ptr = &app->controller_state.ok_long_sent;
+            long_mapping_ptr = &app->controller_state.ok_long_mapping;
             break;
         case InputKeyBack:
-            app->controller_state.back_pressed = is_press;
-            mapping = app->presets[app->active_preset].keymap[FlipperButtonBack];
+            long_mapping = app->presets[app->active_preset].keymap[FlipperButtonBack];
+            long_sent_ptr = &app->controller_state.back_long_sent;
+            long_mapping_ptr = &app->controller_state.back_long_mapping;
             break;
         default:
             key_event = false;
             break;
         }
-        if(key_event && mapping.keycode != 0) {
-            anki_remote_send_key_combo(app, mapping, is_press);
+        // Send long press key if configured - press only (hold)
+        if(key_event && long_mapping.long_keycode != 0) {
+            if(long_sent_ptr) *long_sent_ptr = true;
+            if(long_mapping_ptr) *long_mapping_ptr = long_mapping;
+            KeyMapping temp = {
+                .keycode = long_mapping.long_keycode,
+                .modifiers = long_mapping.long_modifiers,
+                .long_keycode = 0,
+                .long_modifiers = 0
+            };
+            anki_remote_send_key_combo(app, temp, true);  // Press only - keep held
         }
+        return;
+    }
+
+    // Handle press event - just update visual state, don't send key yet
+    if(event->type == InputTypePress) {
+        switch(event->key) {
+        case InputKeyUp:
+            app->controller_state.up_pressed = true;
+            app->controller_state.up_long_sent = false;
+            break;
+        case InputKeyDown:
+            app->controller_state.down_pressed = true;
+            app->controller_state.down_long_sent = false;
+            break;
+        case InputKeyLeft:
+            app->controller_state.left_pressed = true;
+            app->controller_state.left_long_sent = false;
+            break;
+        case InputKeyRight:
+            app->controller_state.right_pressed = true;
+            app->controller_state.right_long_sent = false;
+            break;
+        case InputKeyOk:
+            app->controller_state.ok_pressed = true;
+            app->controller_state.ok_long_sent = false;
+            break;
+        case InputKeyBack:
+            app->controller_state.back_pressed = true;
+            app->controller_state.back_long_sent = false;
+            break;
+        default:
+            break;
+        }
+        return;
+    }
+
+    // Handle release event
+    if(event->type == InputTypeRelease) {
+        KeyMapping mapping = (KeyMapping){0};
+        bool* long_sent_ptr = NULL;
+        KeyMapping* long_mapping_ptr = NULL;
+        bool key_event = true;
+        switch(event->key) {
+        case InputKeyUp:
+            app->controller_state.up_pressed = false;
+            mapping = app->presets[app->active_preset].keymap[FlipperButtonUp];
+            long_sent_ptr = &app->controller_state.up_long_sent;
+            long_mapping_ptr = &app->controller_state.up_long_mapping;
+            break;
+        case InputKeyDown:
+            app->controller_state.down_pressed = false;
+            mapping = app->presets[app->active_preset].keymap[FlipperButtonDown];
+            long_sent_ptr = &app->controller_state.down_long_sent;
+            long_mapping_ptr = &app->controller_state.down_long_mapping;
+            break;
+        case InputKeyLeft:
+            app->controller_state.left_pressed = false;
+            mapping = app->presets[app->active_preset].keymap[FlipperButtonLeft];
+            long_sent_ptr = &app->controller_state.left_long_sent;
+            long_mapping_ptr = &app->controller_state.left_long_mapping;
+            break;
+        case InputKeyRight:
+            app->controller_state.right_pressed = false;
+            mapping = app->presets[app->active_preset].keymap[FlipperButtonRight];
+            long_sent_ptr = &app->controller_state.right_long_sent;
+            long_mapping_ptr = &app->controller_state.right_long_mapping;
+            break;
+        case InputKeyOk:
+            app->controller_state.ok_pressed = false;
+            mapping = app->presets[app->active_preset].keymap[FlipperButtonOk];
+            long_sent_ptr = &app->controller_state.ok_long_sent;
+            long_mapping_ptr = &app->controller_state.ok_long_mapping;
+            break;
+        case InputKeyBack:
+            app->controller_state.back_pressed = false;
+            mapping = app->presets[app->active_preset].keymap[FlipperButtonBack];
+            long_sent_ptr = &app->controller_state.back_long_sent;
+            long_mapping_ptr = &app->controller_state.back_long_mapping;
+            break;
+        default:
+            key_event = false;
+            break;
+        }
+        bool long_was_sent = long_sent_ptr && *long_sent_ptr;
+        if(key_event) {
+            if(long_was_sent && long_mapping_ptr && long_mapping_ptr->long_keycode != 0) {
+                // Release the long press key
+                KeyMapping temp = {
+                    .keycode = long_mapping_ptr->long_keycode,
+                    .modifiers = long_mapping_ptr->long_modifiers,
+                    .long_keycode = 0,
+                    .long_modifiers = 0
+                };
+                anki_remote_send_key_combo(app, temp, false);  // Release
+            } else if (!long_was_sent && mapping.keycode != 0) {
+                // Short press - send press and release
+                anki_remote_send_key_combo(app, mapping, true);
+                anki_remote_send_key_combo(app, mapping, false);
+            }
+        }
+        // Reset the long_sent flag and mapping
+        if(long_sent_ptr) *long_sent_ptr = false;
+        if(long_mapping_ptr) long_mapping_ptr->long_keycode = 0;
     }
 }
 
@@ -1061,7 +1300,7 @@ static void anki_remote_scene_preset_manager_input_handler(AnkiRemoteApp* app, I
 
 static void anki_remote_reset_keymap_only_for_preset(Preset* preset) {
     for(uint8_t i = 0; i < NUM_FLIPPER_BUTTONS; ++i) {
-        preset->keymap[i] = (KeyMapping){.keycode = 0, .modifiers = 0};
+        preset->keymap[i] = (KeyMapping){.keycode = 0, .modifiers = 0, .long_keycode = 0, .long_modifiers = 0};
     }
 }
 
@@ -1084,14 +1323,33 @@ static void anki_remote_scene_preset_edit_menu_draw_callback(Canvas* canvas, voi
         if(item_index >= total_items) break;
 
         uint8_t y_pos = y_start + (i * y_spacing);
-        char label[40];
+        char label[64];
 
         bool is_selected = (item_index == app->preset_edit_menu_state.selected_item);
 
         if(item_index < NUM_FLIPPER_BUTTONS) {
-            char key_name_buffer[24];
-            get_key_combo_name(app->presets[app->preset_edit_menu_state.editing_preset_index].keymap[item_index], key_name_buffer, sizeof(key_name_buffer));
-            snprintf(label, sizeof(label), "%s: %s", get_button_name(item_index), key_name_buffer);
+            // Show both short and long press mappings
+            KeyMapping map = app->presets[app->preset_edit_menu_state.editing_preset_index].keymap[item_index];
+            char short_buf[16], long_buf[16];
+
+            // Get short press name
+            if(map.keycode != 0) {
+                KeyMapping temp = {.keycode = map.keycode, .modifiers = map.modifiers};
+                get_key_combo_name(temp, short_buf, sizeof(short_buf));
+            } else {
+                strlcpy(short_buf, "-", sizeof(short_buf));
+            }
+
+            // Get long press name
+            if(map.long_keycode != 0) {
+                KeyMapping temp = {.keycode = map.long_keycode, .modifiers = map.long_modifiers};
+                get_key_combo_name(temp, long_buf, sizeof(long_buf));
+            } else {
+                strlcpy(long_buf, "-", sizeof(long_buf));
+            }
+
+            // Format: "Btn: short/long"
+            snprintf(label, sizeof(label), "%s: %s/%s", get_button_name(item_index), short_buf, long_buf);
         } else {
             strlcpy(label, "Reset Mappings", sizeof(label));
         }
@@ -1263,14 +1521,36 @@ static void anki_remote_scene_keypicker_draw_callback(Canvas* canvas, void* cont
     AnkiRemoteApp* app = context;
     canvas_clear(canvas);
     canvas_set_font(canvas, FontSecondary);
+
+    // Show button name, preset name, and whether editing short or long press
     char header_str[48];
     snprintf(
         header_str,
         sizeof(header_str),
-        "Set key for %s (%s)",
+        "%s: %s (%s) [%s]",
         get_button_name(app->settings_state.configuring_button),
-        app->presets[app->settings_state.editing_preset_index].name);
+        app->settings_state.editing_long_press ? "LONG" : "SHORT",
+        app->presets[app->settings_state.editing_preset_index].name,
+        app->settings_state.editing_long_press ? "hold OK" : "hold OK");
     canvas_draw_str(canvas, 2, 10, header_str);
+
+    // Show current mapping for the selected mode
+    char current_str[32];
+    KeyMapping current_map = app->presets[app->settings_state.editing_preset_index]
+        .keymap[app->settings_state.configuring_button];
+    uint8_t current_keycode = app->settings_state.editing_long_press ?
+        current_map.long_keycode : current_map.keycode;
+    uint8_t current_mods = app->settings_state.editing_long_press ?
+        current_map.long_modifiers : current_map.modifiers;
+
+    if(current_keycode != 0) {
+        KeyMapping temp = {.keycode = current_keycode, .modifiers = current_mods};
+        get_key_combo_name(temp, current_str, sizeof(current_str));
+    } else {
+        strlcpy(current_str, "Not mapped", sizeof(current_str));
+    }
+    canvas_draw_str(canvas, 2, 62, current_str);
+
     canvas_set_font(canvas, FontKeyboard);
     uint8_t start_row = (app->settings_state.y > 3) ? (app->settings_state.y - 3) : 0;
     for(uint8_t y = start_row; y < KEYBOARD_ROW_COUNT; y++) {
@@ -1337,6 +1617,14 @@ static void anki_remote_scene_keypicker_input_handler(AnkiRemoteApp* app, InputE
             return;
         }
     }
+
+    // Long press OK toggles between short and long press editing mode
+    if(event->key == InputKeyOk && event->type == InputTypeLong) {
+        app->settings_state.editing_long_press = !app->settings_state.editing_long_press;
+        view_port_update(app->view_port);
+        return;
+    }
+
     if(event->key == InputKeyOk) {
         if(event->type != InputTypePress) return;
     } else {
@@ -1374,9 +1662,15 @@ static void anki_remote_scene_keypicker_input_handler(AnkiRemoteApp* app, InputE
 
     // "Tap" modifier: maps directly as its own keycode (no bitmask)
     if(sel->action == KeyActionTapModifier) {
-        KeyMapping new_mapping = {.keycode = selected_keycode, .modifiers = 0};
-        app->presets[app->settings_state.editing_preset_index]
-            .keymap[app->settings_state.configuring_button] = new_mapping;
+        KeyMapping* existing = &app->presets[app->settings_state.editing_preset_index]
+            .keymap[app->settings_state.configuring_button];
+        if(app->settings_state.editing_long_press) {
+            existing->long_keycode = selected_keycode;
+            existing->long_modifiers = 0;
+        } else {
+            existing->keycode = selected_keycode;
+            existing->modifiers = 0;
+        }
         anki_remote_save_presets(app);
         app->ignore_next_ok_release = true;
         anki_remote_set_scene(app, ScenePresetEditMenu);
@@ -1399,16 +1693,22 @@ static void anki_remote_scene_keypicker_input_handler(AnkiRemoteApp* app, InputE
     }
 
     // Normal key selection with modifiers
-    KeyMapping new_mapping;
-    new_mapping.keycode = selected_keycode;
-    new_mapping.modifiers = 0;
-    if(app->settings_state.shift_pressed) new_mapping.modifiers |= MOD_SHIFT_BIT;
-    if(app->settings_state.ctrl_pressed)  new_mapping.modifiers |= MOD_CTRL_BIT;
-    if(app->settings_state.alt_pressed)   new_mapping.modifiers |= MOD_ALT_BIT;
-    if(app->settings_state.gui_pressed)   new_mapping.modifiers |= MOD_GUI_BIT;
+    uint8_t modifiers = 0;
+    if(app->settings_state.shift_pressed) modifiers |= MOD_SHIFT_BIT;
+    if(app->settings_state.ctrl_pressed)  modifiers |= MOD_CTRL_BIT;
+    if(app->settings_state.alt_pressed)   modifiers |= MOD_ALT_BIT;
+    if(app->settings_state.gui_pressed)   modifiers |= MOD_GUI_BIT;
 
-    app->presets[app->settings_state.editing_preset_index]
-        .keymap[app->settings_state.configuring_button] = new_mapping;
+    // Save to the appropriate field based on editing mode
+    KeyMapping* existing = &app->presets[app->settings_state.editing_preset_index]
+        .keymap[app->settings_state.configuring_button];
+    if(app->settings_state.editing_long_press) {
+        existing->long_keycode = selected_keycode;
+        existing->long_modifiers = modifiers;
+    } else {
+        existing->keycode = selected_keycode;
+        existing->modifiers = modifiers;
+    }
     anki_remote_save_presets(app);
 
     app->ignore_next_ok_release = true;
@@ -1453,6 +1753,7 @@ static void anki_remote_set_scene(AnkiRemoteApp* app, AppScene scene) {
         app->settings_state.ctrl_pressed = false;
         app->settings_state.alt_pressed = false;
         app->settings_state.gui_pressed = false;
+        app->settings_state.editing_long_press = false; // Start with short press
     }
 
     app->current_scene = scene;
