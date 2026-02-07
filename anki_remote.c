@@ -354,52 +354,45 @@ static void anki_remote_set_default_presets(AnkiRemoteApp* app) {
     app->led_brightness = 255;
     preset_init_empty(&app->presets[0], "Default");
 
-    // Set default key mappings, then rotate them anticlockwise once.
-    // Rotation: Up -> Left, Right -> Up, Down -> Right, Left -> Down.
+    // Set default key mappings as specified by user:
+    // (remapped based on actual button behavior - buttons are shifted)
+    // Updated: Down gets Left's old mapping, Left/Right swapped
 
-    KeyMapping km_up = {
-        .keycode = HID_KEYBOARD_Z,
-        .modifiers = MOD_GUI_BIT,
-        .long_keycode = HID_KEYBOARD_2,
-        .long_modifiers = MOD_SHIFT_BIT,
-    };
-    KeyMapping km_right = {
-        .keycode = HID_KEYBOARD_MINUS,
-        .modifiers = 0,
-        .long_keycode = HID_KEYBOARD_UP_ARROW,
-        .long_modifiers = 0,
-    };
-    KeyMapping km_down = {
-        .keycode = HID_KEYBOARD_N,
-        .modifiers = 0,
-        .long_keycode = HID_KEYBOARD_D,
-        .long_modifiers = 0,
-    };
-    KeyMapping km_left = {
-        .keycode = HID_KEYBOARD_1,
-        .modifiers = 0,
-        .long_keycode = HID_KEYBOARD_DOWN_ARROW,
-        .long_modifiers = 0,
-    };
-    KeyMapping km_ok = {
-        .keycode = HID_KEYBOARD_RETURN,
-        .modifiers = 0,
-        .long_keycode = HID_KEYBOARD_Y,
-        .long_modifiers = 0,
-    };
-    KeyMapping km_back = {
-        .keycode = HID_KEYBOARD_S,
-        .modifiers = 0,
-        .long_keycode = 0,
-        .long_modifiers = 0,
-    };
+    // Right (physically Left position): gets Down's old mapping: short='-', long='Up'
+    app->presets[0].keymap[FlipperButtonRight].keycode = HID_KEYBOARD_MINUS;
+    app->presets[0].keymap[FlipperButtonRight].modifiers = 0;
+    app->presets[0].keymap[FlipperButtonRight].long_keycode = HID_KEYBOARD_UP_ARROW;
+    app->presets[0].keymap[FlipperButtonRight].long_modifiers = 0;
 
-    app->presets[0].keymap[FlipperButtonUp] = km_right;
-    app->presets[0].keymap[FlipperButtonRight] = km_down;
-    app->presets[0].keymap[FlipperButtonDown] = km_left;
-    app->presets[0].keymap[FlipperButtonLeft] = km_up;
-    app->presets[0].keymap[FlipperButtonOk] = km_ok;
-    app->presets[0].keymap[FlipperButtonBack] = km_back;
+    // Left (physically Down): gets Right's old mapping: short='1', long='Down'
+    app->presets[0].keymap[FlipperButtonLeft].keycode = HID_KEYBOARD_1;
+    app->presets[0].keymap[FlipperButtonLeft].modifiers = 0;
+    app->presets[0].keymap[FlipperButtonLeft].long_keycode = HID_KEYBOARD_DOWN_ARROW;
+    app->presets[0].keymap[FlipperButtonLeft].long_modifiers = 0;
+
+    // Down (physically Right): short='n', long='d'
+    app->presets[0].keymap[FlipperButtonDown].keycode = HID_KEYBOARD_N;
+    app->presets[0].keymap[FlipperButtonDown].modifiers = 0;
+    app->presets[0].keymap[FlipperButtonDown].long_keycode = HID_KEYBOARD_D;
+    app->presets[0].keymap[FlipperButtonDown].long_modifiers = 0;
+
+    // OK (middle): short='Enter', long='y'
+    app->presets[0].keymap[FlipperButtonOk].keycode = HID_KEYBOARD_RETURN;
+    app->presets[0].keymap[FlipperButtonOk].modifiers = 0;
+    app->presets[0].keymap[FlipperButtonOk].long_keycode = HID_KEYBOARD_Y;
+    app->presets[0].keymap[FlipperButtonOk].long_modifiers = 0;
+
+    // Up: short='undo' (Cmd+Z for Mac), long='shift 2' (@)
+    app->presets[0].keymap[FlipperButtonUp].keycode = HID_KEYBOARD_Z;
+    app->presets[0].keymap[FlipperButtonUp].modifiers = MOD_GUI_BIT;
+    app->presets[0].keymap[FlipperButtonUp].long_keycode = HID_KEYBOARD_2;
+    app->presets[0].keymap[FlipperButtonUp].long_modifiers = MOD_SHIFT_BIT;
+
+    // Back: short='s', long unmapped
+    app->presets[0].keymap[FlipperButtonBack].keycode = HID_KEYBOARD_S;
+    app->presets[0].keymap[FlipperButtonBack].modifiers = 0;
+    app->presets[0].keymap[FlipperButtonBack].long_keycode = 0;
+    app->presets[0].keymap[FlipperButtonBack].long_modifiers = 0;
 }
 
 // We save everything in one file
