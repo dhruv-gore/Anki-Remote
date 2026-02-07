@@ -888,6 +888,24 @@ static void hid_keynote_draw_arrow(Canvas* canvas, uint8_t x, uint8_t y, CanvasD
     }
 }
 
+// Custom helper to draw a button frame "from scratch" using primitives
+static void draw_custom_button_frame(Canvas* canvas, int x, int y, int w, int h) {
+    // Top line
+    canvas_draw_line(canvas, x + 2, y, x + w - 3, y);
+    // Bottom line
+    canvas_draw_line(canvas, x + 2, y + h - 1, x + w - 3, y + h - 1);
+    // Left line
+    canvas_draw_line(canvas, x, y + 2, x, y + h - 3);
+    // Right line
+    canvas_draw_line(canvas, x + w - 1, y + 2, x + w - 1, y + h - 3);
+    
+    // Corners (rounded pixels)
+    canvas_draw_dot(canvas, x + 1, y + 1);
+    canvas_draw_dot(canvas, x + w - 2, y + 1);
+    canvas_draw_dot(canvas, x + 1, y + h - 2);
+    canvas_draw_dot(canvas, x + w - 2, y + h - 2);
+}
+
 static void anki_remote_view_controller_draw(Canvas* canvas, void* context) {
     AnkiRemoteViewModel* model = context;
     AnkiRemoteApp* app = model ? model->app : NULL;
@@ -957,23 +975,23 @@ static void anki_remote_view_controller_draw(Canvas* canvas, void* context) {
         canvas_set_color(canvas, ColorBlack);
 
         // Ok (wide button)
-        canvas_draw_icon(canvas, 0, 86, &I_Space_60x18);
+        draw_custom_button_frame(canvas, 2, 86, 60, 18);
         if(app->controller_state.ok_pressed) {
-            elements_slightly_rounded_box(canvas, 3, 88, 55, 13);
+            elements_slightly_rounded_box(canvas, 5, 88, 55, 13);
             canvas_set_color(canvas, ColorWhite);
         }
-        canvas_draw_icon(canvas, 9, 90, &I_Ok_btn_9x9);
-        elements_multiline_text_aligned(canvas, 24, 98, AlignLeft, AlignBottom, "Space");
+        canvas_draw_icon(canvas, 11, 90, &I_Ok_btn_9x9);
+        elements_multiline_text_aligned(canvas, 26, 98, AlignLeft, AlignBottom, "Space");
         canvas_set_color(canvas, ColorBlack);
 
         // Back (wide button)
-        canvas_draw_icon(canvas, 0, 107, &I_Space_60x18);
+        draw_custom_button_frame(canvas, 2, 107, 60, 18);
         if(app->controller_state.back_pressed) {
-            elements_slightly_rounded_box(canvas, 3, 109, 55, 13);
+            elements_slightly_rounded_box(canvas, 5, 109, 55, 13);
             canvas_set_color(canvas, ColorWhite);
         }
-        canvas_draw_icon(canvas, 9, 111, &I_Pin_back_arrow_10x8);
-        elements_multiline_text_aligned(canvas, 24, 119, AlignLeft, AlignBottom, "Back");
+        canvas_draw_icon(canvas, 11, 111, &I_Pin_back_arrow_10x8);
+        elements_multiline_text_aligned(canvas, 26, 119, AlignLeft, AlignBottom, "Back");
         canvas_set_color(canvas, ColorBlack);
     } else if((cw >= 128) && (ch >= 64)) {
         // Horizontal canvas (Keynote, stock HID layout)
