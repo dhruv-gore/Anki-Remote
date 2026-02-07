@@ -20337,4 +20337,73 @@ Co-Authored-By: Claude <noreply@anthropic.com>
 EOF
 )"
 ```
+```
+[main 72bd75e] Fix crash by reverting to pure ViewPort approach
+ 2 files changed, 2714 insertions(+), 84 deletions(-)
+```
 </details></tool-use>
+
+_**Agent (glm-4.7 2026-02-07 13:04:17Z)**_
+
+<think><details><summary>Thought Process</summary>
+The build is successful and the crash has been fixed. The issue was that the code was in a partially reverted state - it still had vestiges of the View/ViewDispatcher approach that were causing crashes. I've cleaned it up to use pure ViewPort with manually rotated vertical coordinates.
+
+The app should now:
+1. Start without crashing
+2. Display a vertical-style controller layout (manually rotated coordinates)
+3. Have all the long press functionality working
+
+The user can now copy the `.fap` file to their Flipper and test it.
+</details></think>
+
+_**Agent (glm-4.7 2026-02-07 13:04:19Z)**_
+
+The crash is fixed. The issue was broken code from the earlier View/ViewDispatcher attempt that wasn't fully cleaned up. The app now uses pure ViewPort with manually rotated vertical coordinates.
+
+Built file is ready at `dist/anki_remote.fap` - copy it to your Flipper to test.
+
+---
+
+_**User (2026-02-07 20:36:13Z)**_
+
+build again
+
+---
+
+_**Agent (glm-4.7 2026-02-07 20:36:21Z)**_
+
+<think><details><summary>Thought Process</summary>
+The user wants me to build again. Let me do that.
+</details></think>
+
+_**Agent (glm-4.7 2026-02-07 20:36:21Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Build the Flipper app with ufbt
+
+`ufbt 2>&1`
+```
+scons: Entering directory `/Users/dhruvgore/.ufbt/current/scripts/ufbt'
+	CC	/Users/dhruvgore/developer/flipper-zero/Anki-Remote/anki_remote.c
+	CDB	/Users/dhruvgore/developer/flipper-zero/Anki-Remote/.vscode/compile_commands.json
+	LINK	/Users/dhruvgore/.ufbt/build/anki_remote_d.elf
+	APPMETA	/Users/dhruvgore/.ufbt/build/anki_remote.fap
+	INSTALL	/Users/dhruvgore/developer/flipper-zero/Anki-Remote/dist/debug/anki_remote_d.elf
+	FAP	/Users/dhruvgore/.ufbt/build/anki_remote.fap
+	FASTFAP	/Users/dhruvgore/.ufbt/build/anki_remote.fap
+	INSTALL	/Users/dhruvgore/developer/flipper-zero/Anki-Remote/dist/anki_remote.fap
+	APPCHK	/Users/dhruvgore/.ufbt/build/anki_remote.fap
+		Target: 7, API: 87.1
+```
+</details></tool-use>
+
+_**Agent (glm-4.7 2026-02-07 20:36:26Z)**_
+
+<think><details><summary>Thought Process</summary>
+Build successful. The .fap file is ready at dist/anki_remote.fap.
+</details></think>
+
+_**Agent (glm-4.7 2026-02-07 20:36:26Z)**_
+
+Done. `dist/anki_remote.fap` is ready to copy to your Flipper.

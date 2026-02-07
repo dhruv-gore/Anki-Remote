@@ -173,17 +173,27 @@ const HidKeyboardKey hid_keyboard_keyset[KEYBOARD_ROW_COUNT][KEYBOARD_COLUMN_COU
 // App State
 // -----------------------------------------------------------------------------
 
+// View IDs for ViewDispatcher
+typedef enum {
+    AnkiRemoteViewMenu = 0,
+    AnkiRemoteViewController,
+    AnkiRemoteViewPresetManager,
+    AnkiRemoteViewPresetEditMenu,
+    AnkiRemoteViewKeyPicker,
+    AnkiRemoteViewTextInput,  // For rename dialog
+} AnkiRemoteView;
+
 struct AnkiRemoteApp {
     // OS / system handles
     Gui* gui;
-    ViewPort* view_port;
     FuriMessageQueue* event_queue;
     NotificationApp* notifications;
     Bt* bt;
     FuriHalBleProfileBase* ble_hid_profile;
 
-    // Temporary text input (rename)
+    // View system
     ViewDispatcher* view_dispatcher;
+    View* views[5];  // Menu, Controller, PresetManager, PresetEditMenu, KeyPicker
     TextInput* text_input;
 
     // Global app state
@@ -264,15 +274,29 @@ struct AnkiRemoteApp {
 // Forward Declarations
 // -----------------------------------------------------------------------------
 
-static void anki_remote_draw_callback(Canvas* canvas, void* context);
-static void anki_remote_input_callback(InputEvent* input_event, void* context);
+static void anki_remote_view_menu_draw(Canvas* canvas, void* context);
+static bool anki_remote_view_menu_input(InputEvent* event, void* context);
+
+static void anki_remote_view_controller_draw(Canvas* canvas, void* context);
+static bool anki_remote_view_controller_input(InputEvent* event, void* context);
+
+static void anki_remote_view_preset_manager_draw(Canvas* canvas, void* context);
+static bool anki_remote_view_preset_manager_input(InputEvent* event, void* context);
+
+static void anki_remote_view_preset_edit_menu_draw(Canvas* canvas, void* context);
+static bool anki_remote_view_preset_edit_menu_input(InputEvent* event, void* context);
+
+static void anki_remote_view_key_picker_draw(Canvas* canvas, void* context);
+static bool anki_remote_view_key_picker_input(InputEvent* event, void* context);
+
 static void anki_remote_connection_status_callback(BtStatus status, void* context);
-static void anki_remote_set_scene(AnkiRemoteApp* app, AppScene scene);
+static void anki_remote_switch_to_view(AnkiRemoteApp* app, AnkiRemoteView view);
 static void anki_remote_send_key_combo(AnkiRemoteApp* app, KeyMapping mapping, bool is_press);
 static const char* get_button_name(FlipperButton button);
 static void get_key_combo_name(KeyMapping mapping, char* buffer, size_t buffer_size);
 static void anki_remote_reset_keymap_only_for_preset(Preset* preset);
 static void preset_rename_result_cb(void* context);
+static bool anki_remote_exit_callback(void* context);
 
 // -----------------------------------------------------------------------------
 // Persistent Preset Storage
@@ -677,33 +701,16 @@ static void create_new_preset(AnkiRemoteApp* app) {
 // Rename via Text Input
 // -----------------------------------------------------------------------------
 
-// Insane bug fix for the "Renaming File" screen
-static bool anki_remote_view_dispatcher_navigation_cb(void* context) {
-    // context is your app pointer
-    (void)context; // silence unused-warning if needed
-    return false; // signal ViewDispatcher to stop
-}
-
 static void start_text_input_for_rename(AnkiRemoteApp* app, uint8_t preset_index) {
-    // Temporarily give your screen to the dispatcher so it can show the keyboard.
-    view_port_enabled_set(app->view_port, false);
-
-    // Save which preset we are renaming (Fix 2.3 Step 2)
+    // Save which preset we are renaming
     app->rename_preset_index = preset_index;
 
     // Pre-fill buffer with current name
     strlcpy(app->tmp_name, app->presets[preset_index].name, sizeof(app->tmp_name));
 
-    // Create dispatcher and text input
-    app->view_dispatcher = view_dispatcher_alloc();
-
-    view_dispatcher_attach_to_gui(app->view_dispatcher, app->gui, ViewDispatcherTypeFullscreen);
-    view_dispatcher_set_event_callback_context(app->view_dispatcher, app);
-    view_dispatcher_set_navigation_event_callback(app->view_dispatcher, anki_remote_view_dispatcher_navigation_cb);
-
-    app->text_input = text_input_alloc();
+    // Configure text input
+    text_input_reset(app->text_input);
     text_input_set_header_text(app->text_input, "Rename Preset:");
-    // Limit to PRESET_NAME_MAX_LEN characters
     text_input_set_result_callback(
         app->text_input,
         preset_rename_result_cb,
@@ -712,32 +719,15 @@ static void start_text_input_for_rename(AnkiRemoteApp* app, uint8_t preset_index
         PRESET_NAME_MAX_LEN,
         true);
 
-    // Use view id = 0
-    view_dispatcher_add_view(app->view_dispatcher, 0, text_input_get_view(app->text_input));
-    view_dispatcher_switch_to_view(app->view_dispatcher, 0);
-
-    // Blocks until preset_rename_result_cb calls view_dispatcher_stop().
-    view_dispatcher_run(app->view_dispatcher);
-
-    // After run returns, tidy up (safe to free now)
-    if(app->view_dispatcher) {
-        view_dispatcher_remove_view(app->view_dispatcher, 0);
-        view_dispatcher_free(app->view_dispatcher);
-        app->view_dispatcher = NULL;
-    }
-    if(app->text_input) {
-        text_input_free(app->text_input);
-        app->text_input = NULL;
-    }
-    // Re-enable our viewport
-    view_port_enabled_set(app->view_port, true);
+    // Switch to text input view
+    view_dispatcher_switch_to_view(app->view_dispatcher, AnkiRemoteViewTextInput);
 }
 
 // Rename result callback
 static void preset_rename_result_cb(void* context) {
     AnkiRemoteApp* app = context;
     uint8_t idx = app->rename_preset_index; // Use stored index (Fix 2.3 Step 3)
-    
+
     // Ensure index is in range
     if(idx < app->preset_count) {
         // Empty name fallback to default
@@ -748,11 +738,8 @@ static void preset_rename_result_cb(void* context) {
         anki_remote_save_presets(app);
     }
 
-    // Tell the dispatcher to stop; the caller that ran the dispatcher will
-    // handle actual teardown (remove/free) after view_dispatcher_run returns.
-    if(app->view_dispatcher) {
-        view_dispatcher_stop(app->view_dispatcher);
-    }
+    // Switch back to preset manager view
+    view_dispatcher_switch_to_view(app->view_dispatcher, AnkiRemoteViewPresetManager);
 }
 
 // -----------------------------------------------------------------------------
@@ -769,7 +756,7 @@ static void anki_remote_connection_status_callback(BtStatus status, void* contex
     } else {
         furi_hal_light_set(LightBlue, 0); // Off
     }
-    view_port_update(app->view_port);
+    // ViewDispatcher will automatically trigger redraw
 }
 
 // Send or release one key combo over BLE HID
@@ -816,10 +803,10 @@ static void anki_remote_send_key_combo(AnkiRemoteApp* app, KeyMapping mapping, b
 }
 
 // -----------------------------------------------------------------------------
-// Scene Drawing: Menu
+// View: Menu
 // -----------------------------------------------------------------------------
 
-static void anki_remote_scene_menu_draw_callback(Canvas* canvas, void* context) {
+static void anki_remote_view_menu_draw(Canvas* canvas, void* context) {
     AnkiRemoteApp* app = context;
     canvas_clear(canvas);
     canvas_set_font(canvas, FontPrimary);
@@ -837,8 +824,10 @@ static void anki_remote_scene_menu_draw_callback(Canvas* canvas, void* context) 
     }
 }
 
-static void anki_remote_scene_menu_input_handler(AnkiRemoteApp* app, InputEvent* event) {
-    if(event->type != InputTypeShort && event->type != InputTypeRepeat) return;
+static bool anki_remote_view_menu_input(InputEvent* event, void* context) {
+    AnkiRemoteApp* app = context;
+    if(event->type != InputTypeShort && event->type != InputTypeRepeat) return false;
+
     if(event->key == InputKeyUp) {
         app->menu_state.selected_item =
             (app->menu_state.selected_item + MENU_OPTIONS_COUNT - 1) % MENU_OPTIONS_COUNT;
@@ -846,10 +835,10 @@ static void anki_remote_scene_menu_input_handler(AnkiRemoteApp* app, InputEvent*
         app->menu_state.selected_item = (app->menu_state.selected_item + 1) % MENU_OPTIONS_COUNT;
     } else if(event->key == InputKeyOk) {
         if(app->menu_state.selected_item == 0) {
-            anki_remote_set_scene(app, SceneController); // Start
+            anki_remote_switch_to_view(app, AnkiRemoteViewController); // Start
         } else if(app->menu_state.selected_item == 1) {
-            anki_remote_set_scene(app, ScenePresetManager); // Manage Presets
-        } else if(app->menu_state.selected_item == 2) {
+            anki_remote_switch_to_view(app, AnkiRemoteViewPresetManager); // Manage Presets
+        } else if(event->key == InputKeyOk && app->menu_state.selected_item == 2) {
             // Save as Profile - duplicate current preset to new slot
             if(app->preset_count < MAX_PRESETS) {
                 // Duplicate active preset to new slot
@@ -866,10 +855,11 @@ static void anki_remote_scene_menu_input_handler(AnkiRemoteApp* app, InputEvent*
     } else if(event->key == InputKeyBack && event->type == InputTypeShort) {
         app->running = false;
     }
+    return true;
 }
 
 // -----------------------------------------------------------------------------
-// Scene Drawing: Controller
+// View: Controller
 // -----------------------------------------------------------------------------
 
 // D-pad arrow art - exact copy from Flipper Zero HID app
@@ -886,7 +876,7 @@ static void hid_keynote_draw_arrow(Canvas* canvas, uint8_t x, uint8_t y, CanvasD
     }
 }
 
-static void anki_remote_scene_controller_draw_callback(Canvas* canvas, void* context) {
+static void anki_remote_view_controller_draw(Canvas* canvas, void* context) {
     AnkiRemoteApp* app = context;
     canvas_clear(canvas);
     if(!app->connected) {
@@ -981,12 +971,14 @@ static void anki_remote_scene_controller_draw_callback(Canvas* canvas, void* con
 }
 
 
-static void anki_remote_scene_controller_input_handler(AnkiRemoteApp* app, InputEvent* event) {
+static bool anki_remote_view_controller_input(InputEvent* event, void* context) {
+    AnkiRemoteApp* app = context;
+
     // Back: long press to exit; short press is mapped if connected
     if(event->key == InputKeyBack) {
         if(event->type == InputTypeLong || (!app->connected && event->type == InputTypeShort)) {
-            anki_remote_set_scene(app, SceneMenu);
-            return;
+            anki_remote_switch_to_view(app, AnkiRemoteViewMenu);
+            return true;
         }
     }
 
@@ -1043,7 +1035,7 @@ static void anki_remote_scene_controller_input_handler(AnkiRemoteApp* app, Input
             };
             anki_remote_send_key_combo(app, temp, true);  // Press only - keep held
         }
-        return;
+        return true;
     }
 
     // Handle press event - just update visual state, don't send key yet
@@ -1076,7 +1068,7 @@ static void anki_remote_scene_controller_input_handler(AnkiRemoteApp* app, Input
         default:
             break;
         }
-        return;
+        return true;
     }
 
     // Handle release event
@@ -1147,13 +1139,14 @@ static void anki_remote_scene_controller_input_handler(AnkiRemoteApp* app, Input
         if(long_sent_ptr) *long_sent_ptr = false;
         if(long_mapping_ptr) long_mapping_ptr->long_keycode = 0;
     }
+    return true;
 }
 
 // -----------------------------------------------------------------------------
-// Scene Drawing: Preset Manager
+// View: Preset Manager
 // -----------------------------------------------------------------------------
 
-static void anki_remote_scene_preset_manager_draw_callback(Canvas* canvas, void* context) {
+static void anki_remote_view_preset_manager_draw(Canvas* canvas, void* context) {
     AnkiRemoteApp* app = context;
     canvas_clear(canvas);
     canvas_set_font(canvas, FontPrimary);
@@ -1226,14 +1219,16 @@ static void anki_remote_scene_preset_manager_draw_callback(Canvas* canvas, void*
     elements_scrollbar(canvas, app->preset_manager_state.selected_item, total);
 }
 
-static void anki_remote_scene_preset_manager_input_handler(AnkiRemoteApp* app, InputEvent* event) {
+static bool anki_remote_view_preset_manager_input(InputEvent* event, void* context) {
+    AnkiRemoteApp* app = context;
+
     if(app->ignore_next_ok_release && event->key == InputKeyOk &&
        (event->type == InputTypeShort || event->type == InputTypeRelease)) {
         app->ignore_next_ok_release = false;
-        return;
+        return false;
     }
 
-    if(event->type != InputTypeShort && event->type != InputTypeRepeat) return;
+    if(event->type != InputTypeShort && event->type != InputTypeRepeat) return false;
 
     uint8_t total_items = preset_manager_total_items(app);
     uint8_t selected_item = app->preset_manager_state.selected_item;
@@ -1243,8 +1238,8 @@ static void anki_remote_scene_preset_manager_input_handler(AnkiRemoteApp* app, I
     } else if(event->key == InputKeyDown) {
         selected_item = (selected_item + 1) % total_items;
     } else if(event->key == InputKeyBack) {
-        anki_remote_set_scene(app, SceneMenu);
-        return;
+        anki_remote_switch_to_view(app, AnkiRemoteViewMenu);
+        return true;
     } else if(event->key == InputKeyOk) {
         // Activate preset if a preset row is selected
         if(selected_item < app->preset_count) {
@@ -1255,7 +1250,7 @@ static void anki_remote_scene_preset_manager_input_handler(AnkiRemoteApp* app, I
             // Edit Selected: edits the active preset (the one with the star)
             if(app->active_preset < app->preset_count) {
                 app->preset_edit_menu_state.editing_preset_index = app->active_preset;
-                anki_remote_set_scene(app, ScenePresetEditMenu);
+                anki_remote_switch_to_view(app, AnkiRemoteViewPresetEditMenu);
             }
         } else if(selected_item == app->preset_count + 1) {
             // Rename Selected: rename the active preset
@@ -1304,7 +1299,7 @@ static void anki_remote_scene_preset_manager_input_handler(AnkiRemoteApp* app, I
     uint8_t y_start = 19;
     uint8_t y_spacing = 10;
     const uint8_t visible_items = ((64 - y_start) / y_spacing) + 1;
-    
+
     if(selected_item < app->preset_manager_state.scroll_offset) {
         app->preset_manager_state.scroll_offset = selected_item;
     } else if(selected_item >= app->preset_manager_state.scroll_offset + visible_items) {
@@ -1312,6 +1307,7 @@ static void anki_remote_scene_preset_manager_input_handler(AnkiRemoteApp* app, I
     }
 
     app->preset_manager_state.selected_item = selected_item;
+    return true;
 }
 
 // -----------------------------------------------------------------------------
@@ -1324,7 +1320,7 @@ static void anki_remote_reset_keymap_only_for_preset(Preset* preset) {
     }
 }
 
-static void anki_remote_scene_preset_edit_menu_draw_callback(Canvas* canvas, void* context) {
+static void anki_remote_view_preset_edit_menu_draw(Canvas* canvas, void* context) {
     AnkiRemoteApp* app = context;
     canvas_clear(canvas);
     canvas_set_font(canvas, FontPrimary);
@@ -1386,13 +1382,15 @@ static void anki_remote_scene_preset_edit_menu_draw_callback(Canvas* canvas, voi
     elements_scrollbar(canvas, app->preset_edit_menu_state.selected_item, total_items);
 }
 
-static void anki_remote_scene_preset_edit_menu_input_handler(AnkiRemoteApp* app, InputEvent* event) {
+static bool anki_remote_view_preset_edit_menu_input(InputEvent* event, void* context) {
+    AnkiRemoteApp* app = context;
+
     if(app->ignore_next_ok_release && event->key == InputKeyOk &&
        (event->type == InputTypeShort || event->type == InputTypeRelease)) {
         app->ignore_next_ok_release = false;
-        return;
+        return false;
     }
-    if(event->type != InputTypeShort && event->type != InputTypeRepeat) return;
+    if(event->type != InputTypeShort && event->type != InputTypeRepeat) return false;
 
     const uint8_t total_items = NUM_FLIPPER_BUTTONS + 1;
     uint8_t selected_item = app->preset_edit_menu_state.selected_item;
@@ -1402,32 +1400,32 @@ static void anki_remote_scene_preset_edit_menu_input_handler(AnkiRemoteApp* app,
     } else if(event->key == InputKeyDown) {
         selected_item = (selected_item + 1) % total_items;
     } else if(event->key == InputKeyBack) {
-        anki_remote_set_scene(app, ScenePresetManager);
+        anki_remote_switch_to_view(app, AnkiRemoteViewPresetManager);
+        return true;
     } else if(event->key == InputKeyOk) {
         if(selected_item < NUM_FLIPPER_BUTTONS) {
             app->settings_state.configuring_button = selected_item;
             app->settings_state.editing_preset_index = app->preset_edit_menu_state.editing_preset_index;
-            anki_remote_set_scene(app, SceneKeyPicker);
+            anki_remote_switch_to_view(app, AnkiRemoteViewKeyPicker);
         } else {
             // Reset only mappings (not brightness)
             anki_remote_reset_keymap_only_for_preset(&app->presets[app->preset_edit_menu_state.editing_preset_index]);
             anki_remote_save_presets(app);
         }
-    } else if(event->key == InputKeyBack) {
-        anki_remote_set_scene(app, ScenePresetManager);
     }
 
     // Scrolling the edit menu
     uint8_t y_start = 19;
     uint8_t y_spacing = 10;
     const uint8_t visible_items = ((64 - y_start) / y_spacing) + 1;
-    
+
     if(selected_item < app->preset_edit_menu_state.scroll_offset) {
         app->preset_edit_menu_state.scroll_offset = selected_item;
     } else if(selected_item >= app->preset_edit_menu_state.scroll_offset + visible_items) {
         app->preset_edit_menu_state.scroll_offset = selected_item - visible_items + 1;
     }
     app->preset_edit_menu_state.selected_item = selected_item;
+    return true;
 }
 
 // -----------------------------------------------------------------------------
@@ -1537,7 +1535,7 @@ static void hid_keyboard_draw_key(
     }
 }
 
-static void anki_remote_scene_keypicker_draw_callback(Canvas* canvas, void* context) {
+static void anki_remote_view_key_picker_draw(Canvas* canvas, void* context) {
     AnkiRemoteApp* app = context;
     canvas_clear(canvas);
     canvas_set_font(canvas, FontSecondary);
@@ -1630,42 +1628,44 @@ static void settings_move_cursor(AnkiRemoteApp* app, int8_t dx, int8_t dy) {
     app->settings_state.y = (uint8_t)current_y;
 }
 
-static void anki_remote_scene_keypicker_input_handler(AnkiRemoteApp* app, InputEvent* event) {
+static bool anki_remote_view_key_picker_input(InputEvent* event, void* context) {
+    AnkiRemoteApp* app = context;
+
     if(event->key == InputKeyBack) {
         if(event->type == InputTypeShort || event->type == InputTypeLong) {
-            anki_remote_set_scene(app, ScenePresetEditMenu);
-            return;
+            anki_remote_switch_to_view(app, AnkiRemoteViewPresetEditMenu);
+            return true;
         }
     }
 
     // Long press OK toggles between short and long press editing mode
     if(event->key == InputKeyOk && event->type == InputTypeLong) {
         app->settings_state.editing_long_press = !app->settings_state.editing_long_press;
-        view_port_update(app->view_port);
-        return;
+        // View will be automatically updated by ViewDispatcher
+        return true;
     }
 
     if(event->key == InputKeyOk) {
-        if(event->type != InputTypePress) return;
+        if(event->type != InputTypePress) return false;
     } else {
-        if(event->type != InputTypePress && event->type != InputTypeRepeat) return;
+        if(event->type != InputTypePress && event->type != InputTypeRepeat) return false;
     }
 
     // Arrow key presses
     if(event->key == InputKeyUp) {
         settings_move_cursor(app, 0, -1);
-        return;
+        return true;
     } else if(event->key == InputKeyDown) {
         settings_move_cursor(app, 0, 1);
-        return;
+        return true;
     } else if(event->key == InputKeyLeft) {
         settings_move_cursor(app, -1, 0);
-        return;
+        return true;
     } else if(event->key == InputKeyRight) {
         settings_move_cursor(app, 1, 0);
-        return;
+        return true;
     } else if(event->key != InputKeyOk) {
-        return;
+        return false;
     }
 
     // OK pressed: get the selected key
@@ -1693,8 +1693,8 @@ static void anki_remote_scene_keypicker_input_handler(AnkiRemoteApp* app, InputE
         }
         anki_remote_save_presets(app);
         app->ignore_next_ok_release = true;
-        anki_remote_set_scene(app, ScenePresetEditMenu);
-        return;
+        anki_remote_switch_to_view(app, AnkiRemoteViewPresetEditMenu);
+        return true;
     }
 
     // Toggle modifier state inside the picker
@@ -1708,8 +1708,8 @@ static void anki_remote_scene_keypicker_input_handler(AnkiRemoteApp* app, InputE
         } else if(selected_keycode == HID_KEYBOARD_L_GUI) {
             app->settings_state.gui_pressed = !app->settings_state.gui_pressed;
         }
-        view_port_update(app->view_port);
-        return;
+        // View will be automatically updated by ViewDispatcher
+        return true;
     }
 
     // Normal key selection with modifiers
@@ -1732,41 +1732,44 @@ static void anki_remote_scene_keypicker_input_handler(AnkiRemoteApp* app, InputE
     anki_remote_save_presets(app);
 
     app->ignore_next_ok_release = true;
-    anki_remote_set_scene(app, ScenePresetEditMenu);
-    return;
+    anki_remote_switch_to_view(app, AnkiRemoteViewPresetEditMenu);
+    return true;
 }
 
 // -----------------------------------------------------------------------------
-// Scene Switching
+// View Switching
 // -----------------------------------------------------------------------------
 
-static void anki_remote_set_scene(AnkiRemoteApp* app, AppScene scene) {
-    AppScene old_scene = app->current_scene;
-    if(old_scene == scene) return;
+static bool anki_remote_exit_callback(void* context) {
+    AnkiRemoteApp* app = context;
+    app->running = false;
+    return false;  // Return false to exit the app
+}
 
-    // Clean up any scene we are leaving
-    if(old_scene == SceneController) {
+static void anki_remote_switch_to_view(AnkiRemoteApp* app, AnkiRemoteView view) {
+    // Clean up controller when leaving it
+    if(app->current_scene == SceneController && view != AnkiRemoteViewController) {
         bt_disconnect(app->bt);
         furi_delay_ms(200);
         bt_set_status_changed_callback(app->bt, NULL, NULL);
         furi_check(bt_profile_restore_default(app->bt));
     }
 
-    // Initialize new scene if needed
-    if(scene == SceneController) {
+    // Initialize scene when entering
+    if(view == AnkiRemoteViewController && app->current_scene != SceneController) {
         memset(&app->controller_state, 0, sizeof(app->controller_state));
         bt_set_status_changed_callback(app->bt, anki_remote_connection_status_callback, app);
         app->ble_hid_profile = bt_profile_start(app->bt, ble_profile_hid, NULL);
         furi_check(app->ble_hid_profile);
         furi_hal_bt_start_advertising();
-    } else if(scene == ScenePresetManager) {
+    } else if(view == AnkiRemoteViewPresetManager) {
         app->preset_manager_state.selected_item = 0;
         app->preset_manager_state.scroll_offset = 0;
         if(app->highlighted_preset >= app->preset_count) app->highlighted_preset = 0;
-    } else if(scene == ScenePresetEditMenu) {
+    } else if(view == AnkiRemoteViewPresetEditMenu) {
         app->preset_edit_menu_state.selected_item = 0;
         app->preset_edit_menu_state.scroll_offset = 0;
-    } else if(scene == SceneKeyPicker) {
+    } else if(view == AnkiRemoteViewKeyPicker) {
         app->settings_state.x = 0;
         app->settings_state.y = 1;
         app->settings_state.shift_pressed = false;
@@ -1776,60 +1779,28 @@ static void anki_remote_set_scene(AnkiRemoteApp* app, AppScene scene) {
         app->settings_state.editing_long_press = false;
     }
 
-    app->current_scene = scene;
-}
-
-// -----------------------------------------------------------------------------
-// Top-Level Draw & Input Dispatch
-// -----------------------------------------------------------------------------
-
-static void anki_remote_draw_callback(Canvas* canvas, void* context) {
-    AnkiRemoteApp* app = (AnkiRemoteApp*)context;
-    furi_assert(app);
-    switch(app->current_scene) {
-    case SceneMenu:
-        anki_remote_scene_menu_draw_callback(canvas, app);
+    // Update current scene tracking
+    switch(view) {
+    case AnkiRemoteViewMenu:
+        app->current_scene = SceneMenu;
         break;
-    case SceneController:
-        anki_remote_scene_controller_draw_callback(canvas, app);
+    case AnkiRemoteViewController:
+        app->current_scene = SceneController;
         break;
-    case ScenePresetManager:
-        anki_remote_scene_preset_manager_draw_callback(canvas, app);
+    case AnkiRemoteViewPresetManager:
+        app->current_scene = ScenePresetManager;
         break;
-    case ScenePresetEditMenu:
-        anki_remote_scene_preset_edit_menu_draw_callback(canvas, app);
+    case AnkiRemoteViewPresetEditMenu:
+        app->current_scene = ScenePresetEditMenu;
         break;
-    case SceneKeyPicker:
-        anki_remote_scene_keypicker_draw_callback(canvas, app);
+    case AnkiRemoteViewKeyPicker:
+        app->current_scene = SceneKeyPicker;
+        break;
+    default:
         break;
     }
-}
 
-static void anki_remote_input_handler(AnkiRemoteApp* app, InputEvent* event) {
-    switch(app->current_scene) {
-    case SceneMenu:
-        anki_remote_scene_menu_input_handler(app, event);
-        break;
-    case SceneController:
-        anki_remote_scene_controller_input_handler(app, event);
-        break;
-    case ScenePresetManager:
-        anki_remote_scene_preset_manager_input_handler(app, event);
-        break;
-    case ScenePresetEditMenu:
-        anki_remote_scene_preset_edit_menu_input_handler(app, event);
-        break;
-    case SceneKeyPicker:
-        anki_remote_scene_keypicker_input_handler(app, event);
-        break;
-    }
-}
-
-static void anki_remote_input_callback(InputEvent* input_event, void* context) {
-    furi_assert(context);
-    FuriMessageQueue* event_queue = context;
-    AnkiRemoteEvent event = {.type = EventTypeInput, .input = *input_event};
-    furi_message_queue_put(event_queue, &event, FuriWaitForever);
+    view_dispatcher_switch_to_view(app->view_dispatcher, view);
 }
 
 // -----------------------------------------------------------------------------
@@ -1846,12 +1817,54 @@ static AnkiRemoteApp* anki_remote_app_alloc() {
     app->bt = furi_record_open(RECORD_BT);
     bt_keys_storage_set_storage_path(app->bt, HID_BT_KEYS_STORAGE_PATH);
 
-    // Allocate view_port for menu/settings screens
-    app->view_port = view_port_alloc();
-    view_port_draw_callback_set(app->view_port, anki_remote_draw_callback, app);
-    view_port_input_callback_set(app->view_port, anki_remote_input_callback, app->event_queue);
-    gui_add_view_port(app->gui, app->view_port, GuiLayerFullscreen);
+    // Allocate ViewDispatcher
+    app->view_dispatcher = view_dispatcher_alloc();
+    view_dispatcher_attach_to_gui(app->view_dispatcher, app->gui, ViewDispatcherTypeFullscreen);
+    view_dispatcher_set_event_callback_context(app->view_dispatcher, app);
+    view_dispatcher_set_navigation_event_callback(app->view_dispatcher, anki_remote_exit_callback);
 
+    // Allocate Views
+    // Menu View
+    app->views[AnkiRemoteViewMenu] = view_alloc();
+    view_set_context(app->views[AnkiRemoteViewMenu], app);
+    view_set_draw_callback(app->views[AnkiRemoteViewMenu], anki_remote_view_menu_draw);
+    view_set_input_callback(app->views[AnkiRemoteViewMenu], anki_remote_view_menu_input);
+    view_dispatcher_add_view(app->view_dispatcher, AnkiRemoteViewMenu, app->views[AnkiRemoteViewMenu]);
+
+    // Controller View - with VERTICAL FLIP orientation for Keynote layout!
+    app->views[AnkiRemoteViewController] = view_alloc();
+    view_set_context(app->views[AnkiRemoteViewController], app);
+    view_set_draw_callback(app->views[AnkiRemoteViewController], anki_remote_view_controller_draw);
+    view_set_input_callback(app->views[AnkiRemoteViewController], anki_remote_view_controller_input);
+    view_set_orientation(app->views[AnkiRemoteViewController], ViewOrientationVerticalFlip);
+    view_dispatcher_add_view(app->view_dispatcher, AnkiRemoteViewController, app->views[AnkiRemoteViewController]);
+
+    // Preset Manager View
+    app->views[AnkiRemoteViewPresetManager] = view_alloc();
+    view_set_context(app->views[AnkiRemoteViewPresetManager], app);
+    view_set_draw_callback(app->views[AnkiRemoteViewPresetManager], anki_remote_view_preset_manager_draw);
+    view_set_input_callback(app->views[AnkiRemoteViewPresetManager], anki_remote_view_preset_manager_input);
+    view_dispatcher_add_view(app->view_dispatcher, AnkiRemoteViewPresetManager, app->views[AnkiRemoteViewPresetManager]);
+
+    // Preset Edit Menu View
+    app->views[AnkiRemoteViewPresetEditMenu] = view_alloc();
+    view_set_context(app->views[AnkiRemoteViewPresetEditMenu], app);
+    view_set_draw_callback(app->views[AnkiRemoteViewPresetEditMenu], anki_remote_view_preset_edit_menu_draw);
+    view_set_input_callback(app->views[AnkiRemoteViewPresetEditMenu], anki_remote_view_preset_edit_menu_input);
+    view_dispatcher_add_view(app->view_dispatcher, AnkiRemoteViewPresetEditMenu, app->views[AnkiRemoteViewPresetEditMenu]);
+
+    // Key Picker View
+    app->views[AnkiRemoteViewKeyPicker] = view_alloc();
+    view_set_context(app->views[AnkiRemoteViewKeyPicker], app);
+    view_set_draw_callback(app->views[AnkiRemoteViewKeyPicker], anki_remote_view_key_picker_draw);
+    view_set_input_callback(app->views[AnkiRemoteViewKeyPicker], anki_remote_view_key_picker_input);
+    view_dispatcher_add_view(app->view_dispatcher, AnkiRemoteViewKeyPicker, app->views[AnkiRemoteViewKeyPicker]);
+
+    // Allocate TextInput (for rename)
+    app->text_input = text_input_alloc();
+    view_dispatcher_add_view(app->view_dispatcher, AnkiRemoteViewTextInput, text_input_get_view(app->text_input));
+
+    // Initialize state
     app->running = true;
     app->connected = false;
     app->current_scene = SceneMenu;
@@ -1863,11 +1876,17 @@ static AnkiRemoteApp* anki_remote_app_alloc() {
     app->active_preset = 0;
     app->highlighted_preset = 0;
     anki_remote_load_presets(app);
+
+    // Start at menu
+    view_dispatcher_switch_to_view(app->view_dispatcher, AnkiRemoteViewMenu);
+
     return app;
 }
 
 static void anki_remote_app_free(AnkiRemoteApp* app) {
     furi_assert(app);
+
+    // Clean up controller if active
     if(app->current_scene == SceneController) {
         bt_disconnect(app->bt);
         furi_delay_ms(200);
@@ -1875,19 +1894,25 @@ static void anki_remote_app_free(AnkiRemoteApp* app) {
         bt_profile_restore_default(app->bt);
     }
 
-    // STUPID BUG TOOK 10 BOOBAWAMBA HOURS TO FIGURE OUT
-    if(app->view_dispatcher) {
-        view_dispatcher_free(app->view_dispatcher);
-        app->view_dispatcher = NULL;
+    // Free Views
+    for(uint32_t i = 0; i < 5; i++) {
+        if(app->views[i]) {
+            view_dispatcher_remove_view(app->view_dispatcher, i);
+            view_free(app->views[i]);
+        }
     }
+
+    // Free TextInput
     if(app->text_input) {
+        view_dispatcher_remove_view(app->view_dispatcher, AnkiRemoteViewTextInput);
         text_input_free(app->text_input);
         app->text_input = NULL;
     }
 
-    view_port_enabled_set(app->view_port, false);
-    gui_remove_view_port(app->gui, app->view_port);
-    view_port_free(app->view_port);
+    // Free ViewDispatcher
+    view_dispatcher_free(app->view_dispatcher);
+    app->view_dispatcher = NULL;
+
     furi_record_close(RECORD_GUI);
     furi_record_close(RECORD_NOTIFICATION);
 
@@ -1906,16 +1931,9 @@ static void anki_remote_app_free(AnkiRemoteApp* app) {
 int32_t anki_remote_app(void* p) {
     UNUSED(p);
     AnkiRemoteApp* app = anki_remote_app_alloc();
-    AnkiRemoteEvent event;
 
-    while(app->running) {
-        if(furi_message_queue_get(app->event_queue, &event, FuriWaitForever) == FuriStatusOk) {
-            if(event.type == EventTypeInput) {
-                anki_remote_input_handler(app, &event.input);
-            }
-        }
-        view_port_update(app->view_port);
-    }
+    // Run the ViewDispatcher
+    view_dispatcher_run(app->view_dispatcher);
 
     // Reset LED and clean up
     notification_internal_message(app->notifications, &sequence_reset_blue);
