@@ -34,7 +34,7 @@
 #define PRESETS_PATH APP_DATA_PATH("presets.dat") // New presets file
 
 #define NUM_FLIPPER_BUTTONS 6
-#define MENU_OPTIONS_COUNT 3 // Start, Manage Presets, Save Profile
+#define MENU_OPTIONS_COUNT 3 // Start, Manage Presets, Credits
 
 // This is so it can use the same bluetooth keys as other HID apps
 #define HID_BT_KEYS_STORAGE_PATH EXT_PATH("apps_data/hid_ble/.bt_hid.keys")
@@ -74,6 +74,7 @@ typedef enum {
     ScenePresetManager,
     ScenePresetEditMenu,
     SceneKeyPicker,
+    SceneCredits,
 } AppScene;
 
 typedef enum {
@@ -190,6 +191,7 @@ typedef enum {
     AnkiRemoteViewPresetEditMenu,
     AnkiRemoteViewKeyPicker,
     AnkiRemoteViewTextInput,  // For rename dialog
+    AnkiRemoteViewCredits,
 } AnkiRemoteView;
 
 struct AnkiRemoteApp {
@@ -202,7 +204,7 @@ struct AnkiRemoteApp {
 
     // View system
     ViewDispatcher* view_dispatcher;
-    View* views[5];  // Menu, Controller, PresetManager, PresetEditMenu, KeyPicker
+    View* views[7];  // Menu, Controller, PresetManager, PresetEditMenu, KeyPicker, TextInput, Credits
     TextInput* text_input;
 
     // Global app state
@@ -298,6 +300,9 @@ static bool anki_remote_view_preset_edit_menu_input(InputEvent* event, void* con
 
 static void anki_remote_view_key_picker_draw(Canvas* canvas, void* context);
 static bool anki_remote_view_key_picker_input(InputEvent* event, void* context);
+
+static void anki_remote_view_credits_draw(Canvas* canvas, void* context);
+static bool anki_remote_view_credits_input(InputEvent* event, void* context);
 
 static void anki_remote_connection_status_callback(BtStatus status, void* context);
 static void anki_remote_switch_to_view(AnkiRemoteApp* app, AnkiRemoteView view);
@@ -684,8 +689,8 @@ static const char* get_led_brightness_label(uint8_t brightness) {
 // -----------------------------------------------------------------------------
 
 static uint8_t preset_manager_total_items(AnkiRemoteApp* app) {
-    // items: presets + Edit + Rename + Delete + Create + LED brightness
-    return app->preset_count + 5;
+    // items: presets + Edit + Rename + Delete + Create + Save as Profile + LED brightness
+    return app->preset_count + 6;
 }
 
 static void draw_preset_row(Canvas* canvas, const char* name, bool is_active, bool is_selected, uint8_t y_pos) {
@@ -857,12 +862,12 @@ static void anki_remote_view_menu_draw(Canvas* canvas, void* context) {
     canvas_set_font(canvas, FontSecondary);
     for(uint8_t i = 0; i < MENU_OPTIONS_COUNT; ++i) {
         if(i == app->menu_state.selected_item) {
-            elements_slightly_rounded_box(canvas, 10, 22 + (i * 15), 108, 13);
+            elements_slightly_rounded_box(canvas, 10, 17 + (i * 15), 108, 13);
             canvas_set_color(canvas, ColorWhite);
         }
-        if(i == 0) canvas_draw_str(canvas, 15, 33, "Start");
-        if(i == 1) canvas_draw_str(canvas, 15, 48, "Manage Presets");
-        if(i == 2) canvas_draw_str(canvas, 15, 63, "Save as Profile");
+        if(i == 0) canvas_draw_str(canvas, 15, 28, "Start");
+        if(i == 1) canvas_draw_str(canvas, 15, 43, "Manage Presets");
+        if(i == 2) canvas_draw_str(canvas, 15, 58, "Credits");
         canvas_set_color(canvas, ColorBlack);
     }
 }
@@ -881,19 +886,8 @@ static bool anki_remote_view_menu_input(InputEvent* event, void* context) {
             anki_remote_switch_to_view(app, AnkiRemoteViewController); // Start
         } else if(app->menu_state.selected_item == 1) {
             anki_remote_switch_to_view(app, AnkiRemoteViewPresetManager); // Manage Presets
-        } else if(event->key == InputKeyOk && app->menu_state.selected_item == 2) {
-            // Save as Profile - duplicate current preset to new slot
-            if(app->preset_count < MAX_PRESETS) {
-                // Duplicate active preset to new slot
-                uint8_t new_idx = app->preset_count;
-                app->presets[new_idx] = app->presets[app->active_preset];
-                // Use a temp buffer to avoid overlap warning
-                char temp_name[PRESET_NAME_MAX_LEN + 1];
-                snprintf(temp_name, sizeof(temp_name), "%s_copy", app->presets[app->active_preset].name);
-                strlcpy(app->presets[new_idx].name, temp_name, PRESET_NAME_MAX_LEN + 1);
-                app->preset_count++;
-                anki_remote_save_presets(app);
-            }
+        } else if(app->menu_state.selected_item == 2) {
+            anki_remote_switch_to_view(app, AnkiRemoteViewCredits);
         }
     } else if(event->key == InputKeyBack && event->type == InputTypeShort) {
         view_dispatcher_stop(app->view_dispatcher);
@@ -1311,6 +1305,8 @@ static void anki_remote_view_preset_manager_draw(Canvas* canvas, void* context) 
             } else if(item_index == app->preset_count + 3) {
                 canvas_draw_str(canvas, 5, y_pos, "Create Preset");
             } else if(item_index == app->preset_count + 4) {
+                canvas_draw_str(canvas, 5, y_pos, "Save as Profile");
+            } else if(item_index == app->preset_count + 5) {
                 // LED brightness line
                 const char* percent_str = get_led_brightness_label(app->led_brightness);
                 const char* label = "LED Brightness:";
@@ -1390,9 +1386,24 @@ static bool anki_remote_view_preset_manager_input(InputEvent* event, void* conte
             // Create preset
             create_new_preset(app);
         } else if(selected_item == app->preset_count + 4) {
+            // Save as Profile - duplicate current preset to new slot
+            if(app->preset_count < MAX_PRESETS) {
+                uint8_t new_idx = app->preset_count;
+                app->presets[new_idx] = app->presets[app->active_preset];
+                char temp_name[PRESET_NAME_MAX_LEN + 1];
+                snprintf(
+                    temp_name,
+                    sizeof(temp_name),
+                    "%s_copy",
+                    app->presets[app->active_preset].name);
+                strlcpy(app->presets[new_idx].name, temp_name, PRESET_NAME_MAX_LEN + 1);
+                app->preset_count++;
+                anki_remote_save_presets(app);
+            }
+        } else if(selected_item == app->preset_count + 5) {
             // LED brightness, handled via left/right
         }
-    } else if(selected_item == (app->preset_count + 4)) {
+    } else if(selected_item == (app->preset_count + 5)) {
         // LED brightness adjustments
         if(event->key == InputKeyLeft) {
             if(app->led_brightness == 0) app->led_brightness = 255;
@@ -1870,6 +1881,34 @@ static bool anki_remote_view_key_picker_input(InputEvent* event, void* context) 
 }
 
 // -----------------------------------------------------------------------------
+// View: Credits
+// -----------------------------------------------------------------------------
+
+static void anki_remote_view_credits_draw(Canvas* canvas, void* context) {
+    AnkiRemoteViewModel* model = context;
+    AnkiRemoteApp* app = model ? model->app : NULL;
+    if(!app) return;
+    canvas_clear(canvas);
+    canvas_set_font(canvas, FontPrimary);
+    canvas_draw_str(canvas, 2, 10, "Credits");
+    canvas_set_font(canvas, FontSecondary);
+    canvas_draw_str(canvas, 2, 26, "Blue5GD - original");
+    canvas_draw_str(canvas, 2, 38, "drgo.re - this version");
+    canvas_draw_str(canvas, 2, 50, "AI-assisted coding");
+    canvas_draw_icon(canvas, 2, 56, &I_Pin_back_arrow_10x8);
+    canvas_draw_str(canvas, 15, 62, "Back");
+}
+
+static bool anki_remote_view_credits_input(InputEvent* event, void* context) {
+    AnkiRemoteApp* app = context;
+    if(event->key == InputKeyBack && (event->type == InputTypeShort || event->type == InputTypeLong)) {
+        anki_remote_switch_to_view(app, AnkiRemoteViewMenu);
+        return true;
+    }
+    return false;
+}
+
+// -----------------------------------------------------------------------------
 // View Switching
 // -----------------------------------------------------------------------------
 
@@ -1939,6 +1978,9 @@ static void anki_remote_switch_to_view(AnkiRemoteApp* app, AnkiRemoteView view) 
         break;
     case AnkiRemoteViewKeyPicker:
         app->current_scene = SceneKeyPicker;
+        break;
+    case AnkiRemoteViewCredits:
+        app->current_scene = SceneCredits;
         break;
     default:
         break;
@@ -2019,6 +2061,16 @@ static AnkiRemoteApp* anki_remote_app_alloc() {
     view_commit_model(app->views[AnkiRemoteViewKeyPicker], false);
     view_dispatcher_add_view(app->view_dispatcher, AnkiRemoteViewKeyPicker, app->views[AnkiRemoteViewKeyPicker]);
 
+    // Credits View
+    app->views[AnkiRemoteViewCredits] = view_alloc();
+    view_set_context(app->views[AnkiRemoteViewCredits], app);
+    view_allocate_model(app->views[AnkiRemoteViewCredits], ViewModelTypeLockFree, sizeof(AnkiRemoteViewModel));
+    ((AnkiRemoteViewModel*)view_get_model(app->views[AnkiRemoteViewCredits]))->app = app;
+    view_set_draw_callback(app->views[AnkiRemoteViewCredits], anki_remote_view_credits_draw);
+    view_set_input_callback(app->views[AnkiRemoteViewCredits], anki_remote_view_credits_input);
+    view_commit_model(app->views[AnkiRemoteViewCredits], false);
+    view_dispatcher_add_view(app->view_dispatcher, AnkiRemoteViewCredits, app->views[AnkiRemoteViewCredits]);
+
     // Allocate TextInput (for rename)
     app->text_input = text_input_alloc();
     view_dispatcher_add_view(app->view_dispatcher, AnkiRemoteViewTextInput, text_input_get_view(app->text_input));
@@ -2049,7 +2101,7 @@ static void anki_remote_app_free(AnkiRemoteApp* app) {
     anki_remote_stop_controller_bt(app);
 
     // Free Views
-    for(uint32_t i = 0; i < 5; i++) {
+    for(uint32_t i = 0; i < 7; i++) {
         if(app->views[i]) {
             view_dispatcher_remove_view(app->view_dispatcher, i);
             view_free(app->views[i]);
