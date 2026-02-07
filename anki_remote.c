@@ -957,9 +957,9 @@ static void anki_remote_view_controller_draw(Canvas* canvas, void* context) {
         canvas_set_color(canvas, ColorBlack);
 
         // Ok (wide button)
-        elements_slightly_rounded_frame(canvas, 0, 86, 64, 18);
+        elements_slightly_rounded_frame(canvas, 2, 86, 60, 18);
         if(app->controller_state.ok_pressed) {
-            elements_slightly_rounded_box(canvas, 2, 88, 60, 13);
+            elements_slightly_rounded_box(canvas, 5, 88, 55, 13);
             canvas_set_color(canvas, ColorWhite);
         }
         canvas_draw_icon(canvas, 11, 90, &I_Ok_btn_9x9);
@@ -967,9 +967,9 @@ static void anki_remote_view_controller_draw(Canvas* canvas, void* context) {
         canvas_set_color(canvas, ColorBlack);
 
         // Back (wide button)
-        elements_slightly_rounded_frame(canvas, 0, 107, 64, 18);
+        elements_slightly_rounded_frame(canvas, 2, 107, 60, 18);
         if(app->controller_state.back_pressed) {
-            elements_slightly_rounded_box(canvas, 2, 109, 60, 13);
+            elements_slightly_rounded_box(canvas, 5, 109, 55, 13);
             canvas_set_color(canvas, ColorWhite);
         }
         canvas_draw_icon(canvas, 11, 111, &I_Pin_back_arrow_10x8);
