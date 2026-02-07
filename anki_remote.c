@@ -1860,7 +1860,7 @@ static void anki_remote_switch_to_view(AnkiRemoteApp* app, AnkiRemoteView view) 
         bt_disconnect(app->bt);
         furi_delay_ms(200);
         bt_set_status_changed_callback(app->bt, NULL, NULL);
-        furi_check(bt_profile_restore_default(app->bt));
+        bt_profile_restore_default(app->bt);
     }
 
     // Initialize scene when entering
