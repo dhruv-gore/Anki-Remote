@@ -177,7 +177,6 @@ struct AnkiRemoteApp {
     // OS / system handles
     Gui* gui;
     ViewPort* view_port;
-    View* controller_view;  // Separate view for controller (supports orientation)
     FuriMessageQueue* event_queue;
     NotificationApp* notifications;
     Bt* bt;
@@ -894,10 +893,8 @@ static void anki_remote_scene_controller_draw_callback(Canvas* canvas, void* con
         canvas_set_font(canvas, FontSecondary);
         canvas_draw_str(canvas, 48, 37, "Awaiting bluetooth");
     } else {
-        // Controller screen - EXACT copy of hid_keynote_draw_vertical_callback
-        // This uses ViewOrientationVerticalFlip (90° CW rotation)
-
-        // Header
+        // Controller screen - Vertical layout (manual 90° rotation of coordinates)
+        // BLE icon (rotated position)
         if(app->connected) {
             canvas_draw_icon(canvas, 0, 0, &I_Ble_connected_15x15);
         } else {
@@ -910,81 +907,68 @@ static void anki_remote_scene_controller_draw_callback(Canvas* canvas, void* con
         canvas_set_font(canvas, FontSecondary);
         elements_multiline_text_aligned(canvas, 15, 19, AlignLeft, AlignTop, "Hold to exit");
 
-        const uint8_t x_2 = 23;
-        const uint8_t x_1 = 2;
-        const uint8_t x_3 = 44;
+        // Vertical T-layout coordinates (manually rotated 90° clockwise for 128x64 screen)
+        // Original vertical: x_2=23, x_1=2, x_3=44, y_1=44, y_2=65
+        // After rotation: swap x/y and adjust
 
-        const uint8_t y_1 = 44;
-        const uint8_t y_2 = 65;
-
-        // Up
-        canvas_draw_icon(canvas, x_2, y_1, &I_Button_18x18);
+        // Up (top of T) - appears on left side
+        canvas_draw_icon(canvas, 44, 2, &I_Button_18x18);
         if(app->controller_state.up_pressed) {
-            elements_slightly_rounded_box(canvas, x_2 + 3, y_1 + 2, 13, 13);
+            elements_slightly_rounded_box(canvas, 47, 4, 13, 13);
             canvas_set_color(canvas, ColorWhite);
         }
-        hid_keynote_draw_arrow(canvas, x_2 + 9, y_1 + 6, CanvasDirectionBottomToTop);
+        hid_keynote_draw_arrow(canvas, 53, 8, CanvasDirectionRightToLeft);
         canvas_set_color(canvas, ColorBlack);
 
-        // Down
-        canvas_draw_icon(canvas, x_2, y_2, &I_Button_18x18);
-        if(app->controller_state.down_pressed) {
-            elements_slightly_rounded_box(canvas, x_2 + 3, y_2 + 2, 13, 13);
-            canvas_set_color(canvas, ColorWhite);
-        }
-        hid_keynote_draw_arrow(canvas, x_2 + 9, y_2 + 10, CanvasDirectionTopToBottom);
-        canvas_set_color(canvas, ColorBlack);
-
-        // Left
-        canvas_draw_icon(canvas, x_1, y_2, &I_Button_18x18);
+        // Left (left of bottom row) - appears at top
+        canvas_draw_icon(canvas, 44, 21, &I_Button_18x18);
         if(app->controller_state.left_pressed) {
-            elements_slightly_rounded_box(canvas, x_1 + 3, y_2 + 2, 13, 13);
+            elements_slightly_rounded_box(canvas, 47, 23, 13, 13);
             canvas_set_color(canvas, ColorWhite);
         }
-        hid_keynote_draw_arrow(canvas, x_1 + 7, y_2 + 8, CanvasDirectionRightToLeft);
+        hid_keynote_draw_arrow(canvas, 53, 29, CanvasDirectionBottomToTop);
         canvas_set_color(canvas, ColorBlack);
 
-        // Right
-        canvas_draw_icon(canvas, x_3, y_2, &I_Button_18x18);
+        // Down (center of bottom row) - appears on left side, below up
+        canvas_draw_icon(canvas, 23, 21, &I_Button_18x18);
+        if(app->controller_state.down_pressed) {
+            elements_slightly_rounded_box(canvas, 26, 23, 13, 13);
+            canvas_set_color(canvas, ColorWhite);
+        }
+        hid_keynote_draw_arrow(canvas, 29, 29, CanvasDirectionBottomToTop);
+        canvas_set_color(canvas, ColorBlack);
+
+        // Right (right of bottom row) - appears on left side, below down
+        canvas_draw_icon(canvas, 2, 21, &I_Button_18x18);
         if(app->controller_state.right_pressed) {
-            elements_slightly_rounded_box(canvas, x_3 + 3, y_2 + 2, 13, 13);
+            elements_slightly_rounded_box(canvas, 5, 23, 13, 13);
             canvas_set_color(canvas, ColorWhite);
         }
-        hid_keynote_draw_arrow(canvas, x_3 + 11, y_2 + 8, CanvasDirectionLeftToRight);
+        hid_keynote_draw_arrow(canvas, 7, 29, CanvasDirectionBottomToTop);
         canvas_set_color(canvas, ColorBlack);
 
-        // Ok
-        canvas_draw_icon(canvas, 2, 86, &I_Space_65x18);
+        // OK - appears at bottom left
+        canvas_draw_icon(canvas, 2, 44, &I_Space_65x18);
         if(app->controller_state.ok_pressed) {
-            elements_slightly_rounded_box(canvas, 5, 88, 60, 13);
+            elements_slightly_rounded_box(canvas, 5, 46, 60, 13);
             canvas_set_color(canvas, ColorWhite);
         }
-        canvas_draw_icon(canvas, 11, 90, &I_Ok_btn_9x9);
-        elements_multiline_text_aligned(canvas, 26, 98, AlignLeft, AlignBottom, "Space");
+        canvas_draw_icon(canvas, 11, 48, &I_Ok_btn_9x9);
+        elements_multiline_text_aligned(canvas, 26, 56, AlignLeft, AlignBottom, "Space");
         canvas_set_color(canvas, ColorBlack);
 
-        // Back
-        canvas_draw_icon(canvas, 2, 107, &I_Space_65x18);
+        // Back - appears below OK
+        canvas_draw_icon(canvas, 70, 44, &I_Space_65x18);
         if(app->controller_state.back_pressed) {
-            elements_slightly_rounded_box(canvas, 5, 109, 60, 13);
+            elements_slightly_rounded_box(canvas, 73, 46, 49, 13);
             canvas_set_color(canvas, ColorWhite);
         }
-        canvas_draw_icon(canvas, 11, 111, &I_Pin_back_arrow_10x8);
-        elements_multiline_text_aligned(canvas, 26, 119, AlignLeft, AlignBottom, "Back");
+        canvas_draw_icon(canvas, 76, 50, &I_Pin_back_arrow_10x8);
+        elements_multiline_text_aligned(canvas, 91, 58, AlignLeft, AlignBottom, "Back");
         canvas_set_color(canvas, ColorBlack);
     }
 }
 
-// Forward declaration
-static void anki_remote_scene_controller_input_handler(AnkiRemoteApp* app, InputEvent* event);
-
-// Controller view input callback (for View-based system)
-static bool anki_remote_controller_view_input_callback(InputEvent* event, void* context) {
-    AnkiRemoteApp* app = context;
-    // Handle the input, return true if consumed
-    anki_remote_scene_controller_input_handler(app, event);
-    return true;  // Always consume input in controller mode
-}
 
 static void anki_remote_scene_controller_input_handler(AnkiRemoteApp* app, InputEvent* event) {
     // Back: long press to exit; short press is mapped if connected
@@ -1751,29 +1735,15 @@ static void anki_remote_set_scene(AnkiRemoteApp* app, AppScene scene) {
 
     // Clean up any scene we are leaving
     if(old_scene == SceneController) {
-        // Disconnect BT and cleanup
         bt_disconnect(app->bt);
         furi_delay_ms(200);
         bt_set_status_changed_callback(app->bt, NULL, NULL);
         furi_check(bt_profile_restore_default(app->bt));
-
-        // Remove controller view, hide it, show view_port
-        view_dispatcher_remove_view(app->view_dispatcher, 0);
-        view_port_enabled_set(app->view_port, true);
-        view_port_update(app->view_port);
     }
 
     // Initialize new scene if needed
     if(scene == SceneController) {
         memset(&app->controller_state, 0, sizeof(app->controller_state));
-
-        // Hide view_port, add and show controller view
-        view_port_enabled_set(app->view_port, false);
-
-        view_dispatcher_add_view(app->view_dispatcher, 0, app->controller_view);
-        view_dispatcher_switch_to_view(app->view_dispatcher, 0);
-
-        // Start BT
         bt_set_status_changed_callback(app->bt, anki_remote_connection_status_callback, app);
         app->ble_hid_profile = bt_profile_start(app->bt, ble_profile_hid, NULL);
         furi_check(app->ble_hid_profile);
@@ -1792,7 +1762,7 @@ static void anki_remote_set_scene(AnkiRemoteApp* app, AppScene scene) {
         app->settings_state.ctrl_pressed = false;
         app->settings_state.alt_pressed = false;
         app->settings_state.gui_pressed = false;
-        app->settings_state.editing_long_press = false; // Start with short press
+        app->settings_state.editing_long_press = false;
     }
 
     app->current_scene = scene;
@@ -1871,17 +1841,6 @@ static AnkiRemoteApp* anki_remote_app_alloc() {
     view_port_input_callback_set(app->view_port, anki_remote_input_callback, app->event_queue);
     gui_add_view_port(app->gui, app->view_port, GuiLayerFullscreen);
 
-    // Allocate controller view with vertical orientation support
-    app->controller_view = view_alloc();
-    view_set_context(app->controller_view, app);
-    view_set_draw_callback(app->controller_view, anki_remote_scene_controller_draw_callback);
-    view_set_input_callback(app->controller_view, anki_remote_controller_view_input_callback);
-    view_set_orientation(app->controller_view, ViewOrientationVerticalFlip);
-
-    // Allocate view_dispatcher and attach to GUI
-    app->view_dispatcher = view_dispatcher_alloc();
-    view_dispatcher_attach_to_gui(app->view_dispatcher, app->gui, ViewDispatcherTypeFullscreen);
-
     app->running = true;
     app->connected = false;
     app->current_scene = SceneMenu;
@@ -1903,12 +1862,6 @@ static void anki_remote_app_free(AnkiRemoteApp* app) {
         furi_delay_ms(200);
         bt_set_status_changed_callback(app->bt, NULL, NULL);
         bt_profile_restore_default(app->bt);
-    }
-
-    // Free controller view
-    if(app->controller_view) {
-        view_free(app->controller_view);
-        app->controller_view = NULL;
     }
 
     // STUPID BUG TOOK 10 BOOBAWAMBA HOURS TO FIGURE OUT
