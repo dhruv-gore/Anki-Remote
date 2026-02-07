@@ -106,9 +106,8 @@ typedef struct AnkiRemoteApp AnkiRemoteApp; // Forward declaration
 // -----------------------------------------------------------------------------
 // View Models
 // -----------------------------------------------------------------------------
-// IMPORTANT: In the current GUI View system, draw callbacks receive the View *model*,
-// not the View context. We store a pointer to the app in each view model so draw
-// callbacks can safely access app state.
+// NOTE: draw callbacks receive the View *model* (not the View context).
+// We store the app pointer in each view model to keep rendering safe.
 typedef struct {
     AnkiRemoteApp* app;
 } AnkiRemoteViewModel;
@@ -537,7 +536,7 @@ static const char* get_button_name_oriented(const AnkiRemoteApp* app, FlipperBut
         // ViewOrientationVerticalFlip remaps physical -> logical:
         // physical Up -> logical Left, physical Down -> logical Right,
         // physical Right -> logical Up, physical Left -> logical Down.
-        // We invert that mapping so labels match how the remote is held vertically.
+        // Invert that mapping so labels match the vertical holding orientation.
         switch(button) {
         case FlipperButtonUp:
             return "Right";
@@ -854,7 +853,7 @@ static void anki_remote_view_menu_draw(Canvas* canvas, void* context) {
     if(!app) return;
     canvas_clear(canvas);
     canvas_set_font(canvas, FontPrimary);
-    canvas_draw_str(canvas, 2, 12, "drgo.re's remote");
+    canvas_draw_str(canvas, 2, 12, "drgo.re's anki remote");
     canvas_set_font(canvas, FontSecondary);
     for(uint8_t i = 0; i < MENU_OPTIONS_COUNT; ++i) {
         if(i == app->menu_state.selected_item) {
@@ -1092,7 +1091,8 @@ static void anki_remote_view_controller_draw(Canvas* canvas, void* context) {
 static bool anki_remote_view_controller_input(InputEvent* event, void* context) {
     AnkiRemoteApp* app = context;
 
-    // Back: long press to exit; short press is mapped if connected
+    // Back: long press always exits (no mapping).
+    // Short press is mapped only when connected.
     if(event->key == InputKeyBack) {
         if(event->type == InputTypeLong || (!app->connected && event->type == InputTypeShort)) {
             app->controller_state.ignore_next_back_release = true;
@@ -1883,6 +1883,7 @@ static void anki_remote_stop_controller_bt(AnkiRemoteApp* app) {
     if(!app || !app->bt) return;
     if(!app->ble_hid_profile) return;
 
+    // Mirror the stock HID teardown order to avoid furi_check failures.
     bt_set_status_changed_callback(app->bt, NULL, NULL);
     furi_hal_bt_stop_advertising();
     bt_disconnect(app->bt);
