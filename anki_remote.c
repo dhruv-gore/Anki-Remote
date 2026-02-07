@@ -888,24 +888,6 @@ static void hid_keynote_draw_arrow(Canvas* canvas, uint8_t x, uint8_t y, CanvasD
     }
 }
 
-// Custom helper to draw a button frame "from scratch" using primitives
-static void draw_custom_button_frame(Canvas* canvas, int x, int y, int w, int h) {
-    // Top line
-    canvas_draw_line(canvas, x + 2, y, x + w - 3, y);
-    // Bottom line
-    canvas_draw_line(canvas, x + 2, y + h - 1, x + w - 3, y + h - 1);
-    // Left line
-    canvas_draw_line(canvas, x, y + 2, x, y + h - 3);
-    // Right line
-    canvas_draw_line(canvas, x + w - 1, y + 2, x + w - 1, y + h - 3);
-    
-    // Corners (rounded pixels)
-    canvas_draw_dot(canvas, x + 1, y + 1);
-    canvas_draw_dot(canvas, x + w - 2, y + 1);
-    canvas_draw_dot(canvas, x + 1, y + h - 2);
-    canvas_draw_dot(canvas, x + w - 2, y + h - 2);
-}
-
 static void anki_remote_view_controller_draw(Canvas* canvas, void* context) {
     AnkiRemoteViewModel* model = context;
     AnkiRemoteApp* app = model ? model->app : NULL;
@@ -974,24 +956,26 @@ static void anki_remote_view_controller_draw(Canvas* canvas, void* context) {
         hid_keynote_draw_arrow(canvas, x_3 + 11, y_2 + 8, CanvasDirectionLeftToRight);
         canvas_set_color(canvas, ColorBlack);
 
-        // Ok (wide button)
-        draw_custom_button_frame(canvas, 2, 86, 60, 18);
+        // Ok (wide button) - keep inside canvas height
+        const uint8_t ok_y = (ch >= 42) ? (uint8_t)(ch - 42) : 0;
+        canvas_draw_icon(canvas, 2, ok_y, &I_Space_60x18);
         if(app->controller_state.ok_pressed) {
-            elements_slightly_rounded_box(canvas, 5, 88, 55, 13);
+            elements_slightly_rounded_box(canvas, 5, ok_y + 2, 55, 13);
             canvas_set_color(canvas, ColorWhite);
         }
-        canvas_draw_icon(canvas, 11, 90, &I_Ok_btn_9x9);
-        elements_multiline_text_aligned(canvas, 26, 98, AlignLeft, AlignBottom, "Space");
+        canvas_draw_icon(canvas, 11, ok_y + 4, &I_Ok_btn_9x9);
+        elements_multiline_text_aligned(canvas, 26, ok_y + 12, AlignLeft, AlignBottom, "Space");
         canvas_set_color(canvas, ColorBlack);
 
-        // Back (wide button)
-        draw_custom_button_frame(canvas, 2, 107, 60, 18);
+        // Back (wide button) - keep inside canvas height
+        const uint8_t back_y = (ch >= 21) ? (uint8_t)(ch - 21) : ok_y;
+        canvas_draw_icon(canvas, 2, back_y, &I_Space_60x18);
         if(app->controller_state.back_pressed) {
-            elements_slightly_rounded_box(canvas, 5, 109, 55, 13);
+            elements_slightly_rounded_box(canvas, 5, back_y + 2, 55, 13);
             canvas_set_color(canvas, ColorWhite);
         }
-        canvas_draw_icon(canvas, 11, 111, &I_Pin_back_arrow_10x8);
-        elements_multiline_text_aligned(canvas, 26, 119, AlignLeft, AlignBottom, "Back");
+        canvas_draw_icon(canvas, 11, back_y + 4, &I_Pin_back_arrow_10x8);
+        elements_multiline_text_aligned(canvas, 26, back_y + 12, AlignLeft, AlignBottom, "Back");
         canvas_set_color(canvas, ColorBlack);
     } else if((cw >= 128) && (ch >= 64)) {
         // Horizontal canvas (Keynote, stock HID layout)
