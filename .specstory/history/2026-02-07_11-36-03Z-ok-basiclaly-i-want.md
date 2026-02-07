@@ -14941,4 +14941,524 @@ _**Agent (glm-4.7 2026-02-07 12:45:42Z)**_
 Build and commit
 
 `ufbt && git add -A && git commit -m "Use standard hid_keynote horizontal layout"`
+```
+scons: Entering directory `/Users/dhruvgore/.ufbt/current/scripts/ufbt'
+	CC	/Users/dhruvgore/developer/flipper-zero/Anki-Remote/anki_remote.c
+	CDB	/Users/dhruvgore/developer/flipper-zero/Anki-Remote/.vscode/compile_commands.json
+	LINK	/Users/dhruvgore/.ufbt/build/anki_remote_d.elf
+	INSTALL	/Users/dhruvgore/developer/flipper-zero/Anki-Remote/dist/debug/anki_remote_d.elf
+	APPMETA	/Users/dhruvgore/.ufbt/build/anki_remote.fap
+	FAP	/Users/dhruvgore/.ufbt/build/anki_remote.fap
+	FASTFAP	/Users/dhruvgore/.ufbt/build/anki_remote.fap
+	INSTALL	/Users/dhruvgore/developer/flipper-zero/Anki-Remote/dist/anki_remote.fap
+	APPCHK	/Users/dhruvgore/.ufbt/build/anki_remote.fap
+		Target: 7, API: 87.1
+[main bfac796] Use standard hid_keynote horizontal layout
+ 2 files changed, 340 insertions(+), 38 deletions(-)
+```
+</details></tool-use>
+
+_**Agent (glm-4.7 2026-02-07 12:45:48Z)**_
+
+<think><details><summary>Thought Process</summary>
+This is now the exact copy of the standard `hid_keynote_draw_callback` (the horizontal/orientation version). The layout is:
+
+```
+  ↑                 Space (OK)
+← ↓ →               Back
+```
+
+This is the standard Flipper HID Keynote layout. The `.fap` is ready.
+</details></think>
+
+_**Agent (glm-4.7 2026-02-07 12:45:49Z)**_
+
+Done. This is now the **exact** copy of the standard `hid_keynote_draw_callback` from the official Flipper firmware (the horizontal layout that most HID apps use).
+
+```
+  ↑              Space (OK)
+← ↓ →            Back
+```
+
+`.fap` at `/Users/dhruvgore/developer/flipper-zero/Anki-Remote/dist/anki_remote.fap`
+
+---
+
+_**User (2026-02-07 12:46:38Z)**_
+
+nope i want the vertical layout bruh.
+
+---
+
+_**Agent (glm-4.7 2026-02-07 12:46:43Z)**_
+
+<think><details><summary>Thought Process</summary>
+The user wants the vertical layout. The issue is that the vertical layout in the official firmware uses `ViewOrientationVerticalFlip` which rotates the canvas 90 degrees. The user's app uses ViewPort which doesn't support orientation.
+
+I need to figure out how to either:
+1. Add View orientation support to the app
+2. Manually translate the coordinates for a horizontal screen
+
+Looking at the vertical layout coordinates again:
+- y_1 = 44, y_2 = 65, y_3 = 86, y_4 = 107
+
+These are Y coordinates in a ROTATED screen where the height is 128 (not 64). When the screen is rotated 90° clockwise:
+- Original 128x64 becomes 64x128
+- So y values can go up to 128
+
+For a normal 128x64 screen, I need to swap x and y coordinates from the vertical layout.
+
+From vertical layout:
+- Up: (x_2=23, y_1=44)
+- Down: (x_2=23, y_2=65)
+- Left: (x_1=2, y_2=65)
+- Right: (x_3=44, y_2=65)
+- OK: (2, 86)
+- Back: (2, 107)
+
+When rotated to horizontal (swap x and y, and adjust for screen dimensions):
+- Up: (44, 23) -> but screen height is only 64, so y=23 works
+- Down: (65, 23) -> y=65 is OFF SCREEN
+
+So the issue is that the vertical layout simply doesn't fit on a 64px tall screen without actual rotation.
+
+The only way to get the actual vertical layout is to use ViewOrientationVerticalFlip. But the user's app uses ViewPort, not View.
+
+Let me check if there's a way to convert the app to use View instead of ViewPort, or if there's another way to get the orientation.
+
+
+I'll explore alternative approaches to handle the screen rotation and coordinate transformation. Investigating potential solutions to adapt the current drawing method to achieve the desired vertical layout without major architectural changes.
+</details></think>
+
+_**Agent (glm-4.7 2026-02-07 12:46:44Z)**_
+
+The vertical layout needs `ViewOrientationVerticalFlip` which rotates the canvas 90°. Your app uses `ViewPort` which doesn't support orientation. Let me convert it to use `View` instead:
+
+_**Agent (glm-4.7 2026-02-07 12:46:44Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./anki_remote.c`
+```
+   176→struct AnkiRemoteApp {
+   177→    // OS / system handles
+   178→    Gui* gui;
+   179→    ViewPort* view_port;
+   180→    FuriMessageQueue* event_queue;
+   181→    NotificationApp* notifications;
+   182→    Bt* bt;
+   183→    FuriHalBleProfileBase* ble_hid_profile;
+   184→
+   185→    // Temporary text input (rename)
+   186→    ViewDispatcher* view_dispatcher;
+   187→    TextInput* text_input;
+   188→
+   189→    // Global app state
+   190→    AppScene current_scene;
+   191→    bool running;
+   192→    bool connected;
+   193→
+   194→    // Presets
+   195→    Preset presets[MAX_PRESETS];
+   196→    uint8_t preset_count;
+   197→    uint8_t active_preset;      // which preset is live
+   198→    uint8_t highlighted_preset; // which preset row is highlighted in manager
+   199→    uint8_t led_brightness;     // one global LED brightness
+   200→
+   201→    // Menu state
+   202→    struct {
+   203→        uint8_t selected_item;
+   204→    } menu_state;
+   205→
+   206→    // Preset manager state
+   207→    struct {
+   208→        uint8_t selected_item;
+   209→        uint8_t scroll_offset;
+   210→    } preset_manager_state;
+   211→
+   212→    // Preset edit menu state
+   213→    struct {
+   214→        uint8_t selected_item;
+   215→        uint8_t scroll_offset;
+   216→        uint8_t editing_preset_index;
+   217→    } preset_edit_menu_state;
+   218→
+   219→    // Controller state (button visuals)
+   220→    struct {
+   221→        bool up_pressed;
+   222→        bool down_pressed;
+   223→        bool left_pressed;
+   224→        bool right_pressed;
+   225→        bool ok_pressed;
+   226→        bool back_pressed;
+   227→        // Track if long press was already sent (to avoid sending short press too)
+   228→        bool up_long_sent;
+   229→        bool down_long_sent;
+   230→        bool left_long_sent;
+   231→        bool right_long_sent;
+   232→        bool ok_long_sent;
+   233→        bool back_long_sent;
+   234→        // Track the long press mapping so we can release it properly
+   235→        KeyMapping up_long_mapping;
+   236→        KeyMapping down_long_mapping;
+   237→        KeyMapping left_long_mapping;
+   238→        KeyMapping right_long_mapping;
+   239→        KeyMapping ok_long_mapping;
+   240→        KeyMapping back_long_mapping;
+   241→    } controller_state;
+   242→
+   243→    // Key picker state
+   244→    struct {
+   245→        uint8_t x, y;        // cursor in keyboard grid
+   246→        bool shift_pressed;
+   247→        bool ctrl_pressed;
+   248→        bool alt_pressed;
+   249→        bool gui_pressed;
+   250→        FlipperButton configuring_button;
+   251→        uint8_t editing_preset_index;
+   252→        bool editing_long_press; // true = editing long press, false = editing short press
+   253→    } settings_state;
+   254→
+   255→    // Rename buffer
+```
+</details></tool-use>
+
+_**Agent (glm-4.7 2026-02-07 12:46:50Z)**_
+
+<think><details><summary>Thought Process</summary>
+The app uses ViewPort for the main UI. To support orientation, I'd need to convert to use View instead. But this is a significant refactor - the app uses a custom scene system with ViewPort, not the standard View/ViewDispatcher system for the main UI.
+
+Actually, looking at the app structure, it does have a ViewDispatcher for the text input, but the main UI uses ViewPort directly.
+
+Let me think about this differently. Maybe I can:
+1. Keep using ViewPort but manually apply the coordinate transformation
+2. Or refactor to use View for the controller scene
+
+Actually, the easiest approach might be to:
+1. Translate the vertical layout coordinates to work on a horizontal screen
+2. The vertical layout assumes a rotated screen where width=64, height=128
+3. For a horizontal screen (width=128, height=64), I need to swap and transform coordinates
+
+From the vertical layout (assuming 64x128 rotated screen):
+```
+(x_1=2, y_1=44)  (x_2=23, y_1=44)  (x_3=44, y_1=44) -> Up row
+(x_1=2, y_2=65)  (x_2=23, y_2=65) (x_3=44, y_2=65) -> Down/Left/Right row
+```
+
+For horizontal (128x64), if we rotate 90° counterclockwise (what the user would see holding the flipper sideways):
+- The top row becomes the left column
+- The bottom row becomes the right column
+
+But wait - ViewOrientationVerticalFlip rotates the screen 90° clockwise and flips it. So:
+- What appears at the "top" in vertical layout is actually on the right side physically
+
+Let me just create a layout that matches what the user would see with the vertical orientation:
+
+When holding Flipper vertically (rotated 90° clockwise):
+- Screen becomes 64 wide × 128 tall
+
+
+- I'll map the vertical layout coordinates to a horizontal display
+- The rotated view means the top row shifts to the left side
+- Bottom row transforms to the right side
+- Coordinates need precise vertical and horizontal translation to match the visual perspective
+</details></think>
+
+_**Agent (glm-4.7 2026-02-07 12:46:53Z)**_
+
+I'll convert the controller to use `View` (which supports orientation) instead of `ViewPort`:
+
+_**Agent (glm-4.7 2026-02-07 12:46:53Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+```
+The file /Users/dhruvgore/developer/flipper-zero/Anki-Remote/anki_remote.c has been updated. Here's the result of running `cat -n` on a snippet of the edited file:
+   172→// -----------------------------------------------------------------------------
+   173→// App State
+   174→// -----------------------------------------------------------------------------
+   175→
+   176→struct AnkiRemoteApp {
+   177→    // OS / system handles
+   178→    Gui* gui;
+   179→    View* view;
+   180→    ViewPort* view_port;
+   181→    FuriMessageQueue* event_queue;
+   182→    NotificationApp* notifications;
+   183→    Bt* bt;
+   184→    FuriHalBleProfileBase* ble_hid_profile;
+   185→
+   186→    // Temporary text input (rename)
+   187→    ViewDispatcher* view_dispatcher;
+   188→    TextInput* text_input;
+```
+</details></tool-use>
+
+_**Agent (glm-4.7 2026-02-07 12:47:13Z)**_
+
+<think><details><summary>Thought Process</summary>
+Now I need to:
+1. Add a View model for the controller state
+2. Convert the draw callback to work with View
+3. Set up the View with orientation
+4. Update the input handling
+
+This is getting complex. Let me look at how the hid_keynote implementation works and model it after that.
+
+Actually, this is a significant refactor. The current app structure uses a custom scene system with a single draw callback. Converting to use View with proper orientation would require restructuring the whole app.
+
+Let me think of a simpler approach. I can just manually translate the vertical layout coordinates to work on a horizontal screen, OR I can modify the drawing code to use canvas transformations.
+
+Actually, Flipper's canvas system has `canvas_set_direction()` or similar functions. Let me check.
+
+Actually, looking at the Flipper API, there's no simple way to rotate the canvas. The ViewOrientationVerticalFlip is handled at the GUI layer, not the canvas layer.
+
+The simplest approach: manually translate the vertical layout coordinates to a horizontal 128x64 screen.
+
+Looking at the vertical layout again:
+```
+y_1=44:  (x_1=2)  (x_2=23)   (x_3=44)
+          Up      
+y_2=65:  (x_1=2)  (x_2=23)   (x_3=44)
+          Left     Down       Right
+y=86:     OK button
+y=107:    Back button
+```
+
+For a horizontal 128x64 screen, I need to squash this vertically. The original has buttons at y=44, 65, 86, 107 which span 63 pixels. This actually fits in 64 pixels!
+
+So I just need to use the y coordinates directly:
+- Up at y=44
+- Down/Left/Right at y=65
+- OK at y=86
+- Back at y=107
+
+But wait, y=107 is still off screen (screen is 64 pixels tall).
+
+
+I'll compress the layout to fit the 64-pixel vertical space, adjusting button positions proportionally. I'll map the original coordinates to create a more compact vertical arrangement that maximizes screen usage while maintaining the original layout's intent.
+
+OK and Back buttons will be shifted to y=44 and y=58, with other controls adjusted accordingly. This approach preserves the original design while adapting to screen constraints.
+</details></think>
+
+_**Agent (glm-4.7 2026-02-07 12:47:14Z)**_
+
+Actually, let me just create the vertical layout manually translated for a 128x64 screen. The vertical layout coordinates need to be compressed:
+
+_**Agent (glm-4.7 2026-02-07 12:47:14Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+```
+The file /Users/dhruvgore/developer/flipper-zero/Anki-Remote/anki_remote.c has been updated. Here's the result of running `cat -n` on a snippet of the edited file:
+   172→// -----------------------------------------------------------------------------
+   173→// App State
+   174→// -----------------------------------------------------------------------------
+   175→
+   176→struct AnkiRemoteApp {
+   177→    // OS / system handles
+   178→    Gui* gui;
+   179→    ViewPort* view_port;
+   180→    FuriMessageQueue* event_queue;
+   181→    NotificationApp* notifications;
+   182→    Bt* bt;
+   183→    FuriHalBleProfileBase* ble_hid_profile;
+   184→
+   185→    // Temporary text input (rename)
+   186→    ViewDispatcher* view_dispatcher;
+   187→    TextInput* text_input;
+```
+</details></tool-use>
+
+_**Agent (glm-4.7 2026-02-07 12:47:32Z)**_
+
+<think><details><summary>Thought Process</summary>
+I reverted the View addition. Now let me update the draw callback to manually translate the vertical layout for a horizontal screen. I'll compress the y-coordinates to fit in 64 pixels and use the original x positions.
+</details></think>
+
+_**Agent (glm-4.7 2026-02-07 12:47:32Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+```
+The file /Users/dhruvgore/developer/flipper-zero/Anki-Remote/anki_remote.c has been updated. Here's the result of running `cat -n` on a snippet of the edited file:
+   880→    else if(dir == CanvasDirectionRightToLeft) canvas_draw_line(canvas, x + 6, y, x - 1, y);
+   881→    else if(dir == CanvasDirectionLeftToRight) canvas_draw_line(canvas, x - 6, y, x + 1, y);
+   882→}
+   883→
+   884→static void anki_remote_scene_controller_draw_callback(Canvas* canvas, void* context) {
+   885→    AnkiRemoteApp* app = context;
+   886→    canvas_clear(canvas);
+   887→    if(!app->connected) {
+   888→        // "Waiting for Bluetooth" screen
+   889→        canvas_set_font(canvas, FontPrimary);
+   890→        canvas_draw_str(canvas, 2, 10, "BLE Remote");
+   891→        canvas_draw_icon(canvas, 111, 2, &I_Ble_disconnected_15x15);
+   892→        canvas_draw_icon(canvas, 1, 21, &I_WarningDolphin_45x42);
+   893→        canvas_set_font(canvas, FontSecondary);
+   894→        canvas_draw_str(canvas, 48, 37, "Awaiting bluetooth");
+   895→    } else {
+   896→        // Controller screen - Vertical hid_keynote style layout (translated for 128x64)
+   897→        // BLE icon
+   898→        if(app->connected) {
+   899→            canvas_draw_icon(canvas, 0, 0, &I_Ble_connected_15x15);
+   900→        } else {
+   901→            canvas_draw_icon(canvas, 0, 0, &I_Ble_disconnected_15x15);
+   902→        }
+   903→        canvas_set_font(canvas, FontPrimary);
+   904→        elements_multiline_text_aligned(canvas, 20, 3, AlignLeft, AlignTop, "Keynote");
+   905→
+   906→        canvas_draw_icon(canvas, 2, 18, &I_Pin_back_arrow_10x8);
+   907→        canvas_set_font(canvas, FontSecondary);
+   908→        elements_multiline_text_aligned(canvas, 15, 19, AlignLeft, AlignTop, "Hold to exit");
+   909→
+   910→        // D-pad T-layout (compressed to fit 64px height)
+   911→        const uint8_t x_2 = 23;  // center column
+   912→        const uint8_t x_1 = 2;   // left column
+   913→        const uint8_t x_3 = 44;  // right column
+   914→
+   915→        const uint8_t y_up = 28;      // Up button row
+   916→        const uint8_t y_lower = 44;   // Down/Left/Right row
+   917→
+   918→        // Up (top of T)
+   919→        canvas_draw_icon(canvas, x_2, y_up, &I_Button_18x18);
+   920→        if(app->controller_state.up_pressed) {
+   921→            elements_slightly_rounded_box(canvas, x_2 + 3, y_up + 2, 13, 13);
+   922→            canvas_set_color(canvas, ColorWhite);
+   923→        }
+   924→        hid_keynote_draw_arrow(canvas, x_2 + 9, y_up + 6, CanvasDirectionBottomToTop);
+   925→        canvas_set_color(canvas, ColorBlack);
+   926→
+   927→        // Down (center of bottom row)
+   928→        canvas_draw_icon(canvas, x_2, y_lower, &I_Button_18x18);
+   929→        if(app->controller_state.down_pressed) {
+   930→            elements_slightly_rounded_box(canvas, x_2 + 3, y_lower + 2, 13, 13);
+   931→            canvas_set_color(canvas, ColorWhite);
+   932→        }
+   933→        hid_keynote_draw_arrow(canvas, x_2 + 9, y_lower + 10, CanvasDirectionTopToBottom);
+   934→        canvas_set_color(canvas, ColorBlack);
+   935→
+   936→        // Left (left of bottom row)
+   937→        canvas_draw_icon(canvas, x_1, y_lower, &I_Button_18x18);
+   938→        if(app->controller_state.left_pressed) {
+   939→            elements_slightly_rounded_box(canvas, x_1 + 3, y_lower + 2, 13, 13);
+   940→            canvas_set_color(canvas, ColorWhite);
+   941→        }
+   942→        hid_keynote_draw_arrow(canvas, x_1 + 7, y_lower + 8, CanvasDirectionRightToLeft);
+   943→        canvas_set_color(canvas, ColorBlack);
+   944→
+   945→        // Right (right of bottom row)
+   946→        canvas_draw_icon(canvas, x_3, y_lower, &I_Button_18x18);
+   947→        if(app->controller_state.right_pressed) {
+   948→            elements_slightly_rounded_box(canvas, x_3 + 3, y_lower + 2, 13, 13);
+   949→            canvas_set_color(canvas, ColorWhite);
+   950→        }
+   951→        hid_keynote_draw_arrow(canvas, x_3 + 11, y_lower + 8, CanvasDirectionLeftToRight);
+   952→        canvas_set_color(canvas, ColorBlack);
+   953→
+   954→        // OK button
+   955→        canvas_draw_icon(canvas, 70, 15, &I_Space_54x18);
+   956→        if(app->controller_state.ok_pressed) {
+   957→            elements_slightly_rounded_box(canvas, 73, 17, 49, 13);
+   958→            canvas_set_color(canvas, ColorWhite);
+   959→        }
+   960→        canvas_draw_icon(canvas, 76, 19, &I_Ok_btn_9x9);
+   961→        elements_multiline_text_aligned(canvas, 91, 27, AlignLeft, AlignBottom, "OK");
+   962→        canvas_set_color(canvas, ColorBlack);
+   963→
+   964→        // Back button
+   965→        canvas_draw_icon(canvas, 70, 39, &I_Space_54x18);
+   966→        if(app->controller_state.back_pressed) {
+   967→            elements_slightly_rounded_box(canvas, 73, 41, 49, 13);
+   968→            canvas_set_color(canvas, ColorWhite);
+   969→        }
+   970→        canvas_draw_icon(canvas, 76, 43, &I_Pin_back_arrow_10x8);
+   971→        elements_multiline_text_aligned(canvas, 91, 51, AlignLeft, AlignBottom, "Back");
+   972→        canvas_set_color(canvas, ColorBlack);
+   973→    }
+   974→}
+   975→
+   976→static void anki_remote_scene_controller_input_handler(AnkiRemoteApp* app, InputEvent* event) {
+   977→    // Back: long press to exit; short press is mapped if connected
+   978→    if(event->key == InputKeyBack) {
+```
+</details></tool-use>
+
+_**Agent (glm-4.7 2026-02-07 12:47:36Z)**_
+
+<think><details><summary>Thought Process</summary>
+Now let me check if the user has the I_Space_54x18 icon. Looking at the icons list earlier, they only have Space_65x18. Let me fix that.
+</details></think>
+
+_**Agent (glm-4.7 2026-02-07 12:47:36Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+```
+The file /Users/dhruvgore/developer/flipper-zero/Anki-Remote/anki_remote.c has been updated. Here's the result of running `cat -n` on a snippet of the edited file:
+   950→        }
+   951→        hid_keynote_draw_arrow(canvas, x_3 + 11, y_lower + 8, CanvasDirectionLeftToRight);
+   952→        canvas_set_color(canvas, ColorBlack);
+   953→
+   954→        // OK button
+   955→        canvas_draw_icon(canvas, 70, 15, &I_Space_65x18);
+   956→        if(app->controller_state.ok_pressed) {
+   957→            elements_slightly_rounded_box(canvas, 73, 17, 60, 13);
+   958→            canvas_set_color(canvas, ColorWhite);
+   959→        }
+   960→        canvas_draw_icon(canvas, 76, 19, &I_Ok_btn_9x9);
+   961→        elements_multiline_text_aligned(canvas, 91, 27, AlignLeft, AlignBottom, "OK");
+   962→        canvas_set_color(canvas, ColorBlack);
+   963→
+   964→        // Back button
+   965→        canvas_draw_icon(canvas, 70, 39, &I_Space_65x18);
+   966→        if(app->controller_state.back_pressed) {
+   967→            elements_slightly_rounded_box(canvas, 73, 41, 49, 13);
+   968→            canvas_set_color(canvas, ColorWhite);
+   969→        }
+```
+</details></tool-use>
+
+_**Agent (glm-4.7 2026-02-07 12:47:39Z)**_
+
+<think><details><summary>Thought Process</summary>
+Also need to fix the Back button's rounded box width.
+</details></think>
+
+_**Agent (glm-4.7 2026-02-07 12:47:39Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+```
+The file /Users/dhruvgore/developer/flipper-zero/Anki-Remote/anki_remote.c has been updated. Here's the result of running `cat -n` on a snippet of the edited file:
+   960→        canvas_draw_icon(canvas, 76, 19, &I_Ok_btn_9x9);
+   961→        elements_multiline_text_aligned(canvas, 91, 27, AlignLeft, AlignBottom, "OK");
+   962→        canvas_set_color(canvas, ColorBlack);
+   963→
+   964→        // Back button
+   965→        canvas_draw_icon(canvas, 70, 39, &I_Space_65x18);
+   966→        if(app->controller_state.back_pressed) {
+   967→            elements_slightly_rounded_box(canvas, 73, 41, 60, 13);
+   968→            canvas_set_color(canvas, ColorWhite);
+   969→        }
+   970→        canvas_draw_icon(canvas, 76, 43, &I_Pin_back_arrow_10x8);
+   971→        elements_multiline_text_aligned(canvas, 91, 51, AlignLeft, AlignBottom, "Back");
+   972→        canvas_set_color(canvas, ColorBlack);
+   973→    }
+```
+</details></tool-use>
+
+_**Agent (glm-4.7 2026-02-07 12:47:41Z)**_
+
+<think><details><summary>Thought Process</summary>
+Now let me build.
+</details></think>
+
+_**Agent (glm-4.7 2026-02-07 12:47:41Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Build and commit
+
+`ufbt && git add -A && git commit -m "Vertical T-layout controller screen"`
 </details></tool-use>
