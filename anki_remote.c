@@ -867,7 +867,7 @@ static bool anki_remote_view_menu_input(InputEvent* event, void* context) {
             }
         }
     } else if(event->key == InputKeyBack && event->type == InputTypeShort) {
-        app->running = false;
+        view_dispatcher_stop(app->view_dispatcher);
     }
     return true;
 }
