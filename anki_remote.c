@@ -244,6 +244,7 @@ struct AnkiRemoteApp {
         bool right_pressed;
         bool ok_pressed;
         bool back_pressed;
+        bool ignore_next_back_release;
         // Track if long press was already sent (to avoid sending short press too)
         bool up_long_sent;
         bool down_long_sent;
@@ -771,6 +772,7 @@ static void anki_remote_connection_status_callback(BtStatus status, void* contex
 
 // Send or release one key combo over BLE HID
 static void anki_remote_send_key_combo(AnkiRemoteApp* app, KeyMapping mapping, bool is_press) {
+    if(!app || !app->ble_hid_profile) return;
     // Helper: detect "pure modifier" mapped as a tap
     bool is_pure_modifier =
         (mapping.modifiers == 0) &&
@@ -1063,6 +1065,7 @@ static bool anki_remote_view_controller_input(InputEvent* event, void* context) 
     // Back: long press to exit; short press is mapped if connected
     if(event->key == InputKeyBack) {
         if(event->type == InputTypeLong || (!app->connected && event->type == InputTypeShort)) {
+            app->controller_state.ignore_next_back_release = true;
             anki_remote_switch_to_view(app, AnkiRemoteViewMenu);
             return true;
         }
@@ -1101,9 +1104,7 @@ static bool anki_remote_view_controller_input(InputEvent* event, void* context) 
             long_mapping_ptr = &app->controller_state.ok_long_mapping;
             break;
         case InputKeyBack:
-            long_mapping = app->presets[app->active_preset].keymap[FlipperButtonBack];
-            long_sent_ptr = &app->controller_state.back_long_sent;
-            long_mapping_ptr = &app->controller_state.back_long_mapping;
+            key_event = false; // Back long-press always exits; no mapping
             break;
         default:
             key_event = false;
@@ -1159,6 +1160,10 @@ static bool anki_remote_view_controller_input(InputEvent* event, void* context) 
 
     // Handle release event
     if(event->type == InputTypeRelease) {
+        if(event->key == InputKeyBack && app->controller_state.ignore_next_back_release) {
+            app->controller_state.ignore_next_back_release = false;
+            return true;
+        }
         KeyMapping mapping = (KeyMapping){0};
         bool* long_sent_ptr = NULL;
         KeyMapping* long_mapping_ptr = NULL;
