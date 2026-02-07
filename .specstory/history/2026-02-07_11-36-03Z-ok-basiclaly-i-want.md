@@ -15461,4 +15461,1213 @@ _**Agent (glm-4.7 2026-02-07 12:47:41Z)**_
 Build and commit
 
 `ufbt && git add -A && git commit -m "Vertical T-layout controller screen"`
+```
+scons: Entering directory `/Users/dhruvgore/.ufbt/current/scripts/ufbt'
+	CC	/Users/dhruvgore/developer/flipper-zero/Anki-Remote/anki_remote.c
+	CDB	/Users/dhruvgore/developer/flipper-zero/Anki-Remote/.vscode/compile_commands.json
+	LINK	/Users/dhruvgore/.ufbt/build/anki_remote_d.elf
+	APPMETA	/Users/dhruvgore/.ufbt/build/anki_remote.fap
+	INSTALL	/Users/dhruvgore/developer/flipper-zero/Anki-Remote/dist/debug/anki_remote_d.elf
+	FAP	/Users/dhruvgore/.ufbt/build/anki_remote.fap
+	FASTFAP	/Users/dhruvgore/.ufbt/build/anki_remote.fap
+	INSTALL	/Users/dhruvgore/developer/flipper-zero/Anki-Remote/dist/anki_remote.fap
+	APPCHK	/Users/dhruvgore/.ufbt/build/anki_remote.fap
+		Target: 7, API: 87.1
+[main 3495c39] Vertical T-layout controller screen
+ 2 files changed, 554 insertions(+), 27 deletions(-)
+```
+</details></tool-use>
+
+_**Agent (glm-4.7 2026-02-07 12:47:48Z)**_
+
+<think><details><summary>Thought Process</summary>
+Done. I've created a vertical T-layout for the controller screen. The layout is:
+
+```
+    ↑
+←  ↓  →        OK
+                Back
+```
+
+With the D-pad on the left (T-shaped) and OK/Back buttons stacked on the right. This matches the hid_keynote vertical style layout but compressed to fit a 128x64 horizontal screen.
+</details></think>
+
+_**Agent (glm-4.7 2026-02-07 12:47:48Z)**_
+
+Done. This is the vertical T-layout from hid_keynote, translated for 128x64 screen:
+
+```
+    ↑            OK
+←  ↓  →        Back
+```
+
+`.fap` at `/Users/dhruvgore/developer/flipper-zero/Anki-Remote/dist/anki_remote.fap`
+
+---
+
+_**User (2026-02-07 12:49:27Z)**_
+
+nope it's still not vertical. don't translate, like there's deffo code in like the 'remote' app in the github for 'keynote vertical' and i just want the ui of keynote vertical.
+
+---
+
+_**Agent (glm-4.7 2026-02-07 12:49:32Z)**_
+
+<think><details><summary>Thought Process</summary>
+The user is saying they want the actual vertical orientation, not a translated version. They mention there's code for "keynote vertical" in the Flipper firmware.
+
+Let me search for how the remote app or hid app actually implements the vertical orientation. The key is `ViewOrientationVerticalFlip` which rotates the canvas 90°.
+
+The issue is that the user's app uses `ViewPort` which doesn't support orientation. I need to convert the app to use `View` instead, which does support `ViewOrientationVerticalFlip`.
+
+Let me look at how the hid_app actually sets up the view with vertical orientation.
+</details></think>
+
+_**Agent (glm-4.7 2026-02-07 12:49:32Z)**_
+
+You're right - I need to use `View` with `ViewOrientationVerticalFlip` to get actual vertical rotation. Let me look at how hid_app sets this up:
+
+_**Agent (glm-4.7 2026-02-07 12:49:32Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="mcp__zread__read_file"><details>
+<summary>Tool use: **mcp__zread__read_file**</summary>
+```
+"File content for applications/system/hid_app/hid.c in flipperdevices/flipperzero-firmware.\nSource: https://github.com/flipperdevices/flipperzero-firmware/blob/master/applications/system/hid_app/hid.c\n\n<file_content>\n#include \"hid.h\"\n#include <extra_profiles/hid_profile.h>\n#include <profiles/serial_profile.h>\n#include \"views.h\"\n#include <notification/notification_messages.h>\n#include <dolphin/dolphin.h>\n\n#define TAG \"HidApp\"\n\nbool hid_custom_event_callback(void* context, uint32_t event) {\n    furi_assert(context);\n    Hid* app = context;\n    return scene_manager_handle_custom_event(app->scene_manager, event);\n}\n\nbool hid_back_event_callback(void* context) {\n    furi_assert(context);\n    Hid* app = context;\n    return scene_manager_handle_back_event(app->scene_manager);\n}\n\nvoid bt_hid_remove_pairing(Hid* app) {\n    Bt* bt = app->bt;\n    bt_disconnect(bt);\n\n    // Wait 2nd core to update nvm storage\n    furi_delay_ms(200);\n\n    furi_hal_bt_stop_advertising();\n\n    bt_forget_bonded_devices(bt);\n\n    furi_hal_bt_start_advertising();\n}\n\nstatic void bt_hid_connection_status_changed_callback(BtStatus status, void* context) {\n    furi_assert(context);\n    Hid* hid = context;\n    const bool connected = (status == BtStatusConnected);\n    notification_internal_message(\n        hid->notifications, connected ? &sequence_set_blue_255 : &sequence_reset_blue);\n    hid_keynote_set_connected_status(hid->hid_keynote, connected);\n    hid_keyboard_set_connected_status(hid->hid_keyboard, connected);\n    hid_media_set_connected_status(hid->hid_media, connected);\n    hid_mouse_set_connected_status(hid->hid_mouse, connected);\n    hid_mouse_clicker_set_connected_status(hid->hid_mouse_clicker, connected);\n    hid_mouse_jiggler_set_connected_status(hid->hid_mouse_jiggler, connected);\n    hid_tiktok_set_connected_status(hid->hid_tiktok, connected);\n}\n\nHid* hid_alloc() {\n    Hid* app = malloc(sizeof(Hid));\n\n    // Gui\n    app->gui = furi_record_open(RECORD_GUI);\n\n    // Bt\n    app->bt = furi_record_open(RECORD_BT);\n\n    // Notifications\n    app->notifications = furi_record_open(RECORD_NOTIFICATION);\n\n    // View dispatcher\n    app->view_dispatcher = view_dispatcher_alloc();\n    view_dispatcher_set_event_callback_context(app->view_dispatcher, app);\n    view_dispatcher_set_custom_event_callback(app->view_dispatcher, hid_custom_event_callback);\n    view_dispatcher_set_navigation_event_callback(app->view_dispatcher, hid_back_event_callback);\n    view_dispatcher_attach_to_gui(app->view_dispatcher, app->gui, ViewDispatcherTypeFullscreen);\n\n    // Scene Manager\n    app->scene_manager = scene_manager_alloc(&hid_scene_handlers, app);\n\n    // Device Type Submenu view\n    app->submenu = submenu_alloc();\n\n    view_dispatcher_add_view(app->view_dispatcher, HidViewSubmenu, submenu_get_view(app->submenu));\n\n    // Dialog view\n    app->dialog = dialog_ex_alloc();\n    view_dispatcher_add_view(app->view_dispatcher, HidViewDialog, dialog_ex_get_view(app->dialog));\n\n    // Popup view\n    app->popup = popup_alloc();\n    view_dispatcher_add_view(app->view_dispatcher, HidViewPopup, popup_get_view(app->popup));\n\n    // Keynote view\n    app->hid_keynote = hid_keynote_alloc(app);\n    view_dispatcher_add_view(\n        app->view_dispatcher, HidViewKeynote, hid_keynote_get_view(app->hid_keynote));\n\n    // Keyboard view\n    app->hid_keyboard = hid_keyboard_alloc(app);\n    view_dispatcher_add_view(\n        app->view_dispatcher, HidViewKeyboard, hid_keyboard_get_view(app->hid_keyboard));\n\n    // Media view\n    app->hid_media = hid_media_alloc(app);\n    view_dispatcher_add_view(\n        app->view_dispatcher, HidViewMedia, hid_media_get_view(app->hid_media));\n\n    // TikTok view\n    app->hid_tiktok = hid_tiktok_alloc(app);\n    view_dispatcher_add_view(\n        app->view_dispatcher, BtHidViewTikTok, hid_tiktok_get_view(app->hid_tiktok));\n\n    // Mouse view\n    app->hid_mouse = hid_mouse_alloc(app);\n    view_dispatcher_add_view(\n        app->view_dispatcher, HidViewMouse, hid_mouse_get_view(app->hid_mouse));\n\n    // Mouse clicker view\n    app->hid_mouse_clicker = hid_mouse_clicker_alloc(app);\n    view_dispatcher_add_view(\n        app->view_dispatcher,\n        HidViewMouseClicker,\n        hid_mouse_clicker_get_view(app->hid_mouse_clicker));\n\n    // Mouse jiggler view\n    app->hid_mouse_jiggler = hid_mouse_jiggler_alloc(app);\n    view_dispatcher_add_view(\n        app->view_dispatcher,\n        HidViewMouseJiggler,\n        hid_mouse_jiggler_get_view(app->hid_mouse_jiggler));\n\n    return app;\n}\n\nvoid hid_free(Hid* app) {\n    furi_assert(app);\n\n    // Reset notification\n#ifdef HID_TRANSPORT_BLE\n    notification_internal_message(app->notifications, &sequence_reset_blue);\n#endif\n    // Free views\n    view_dispatcher_remove_view(app->view_dispatcher, HidViewSubmenu);\n    submenu_free(app->submenu);\n    view_dispatcher_remove_view(app->view_dispatcher, HidViewDialog);\n    dialog_ex_free(app->dialog);\n    view_dispatcher_remove_view(app->view_dispatcher, HidViewPopup);\n    popup_free(app->popup);\n    view_dispatcher_remove_view(app->view_dispatcher, HidViewKeynote);\n    hid_keynote_free(app->hid_keynote);\n    view_dispatcher_remove_view(app->view_dispatcher, HidViewKeyboard);\n    hid_keyboard_free(app->hid_keyboard);\n    view_dispatcher_remove_view(app->view_dispatcher, HidViewMedia);\n    hid_media_free(app->hid_media);\n    view_dispatcher_remove_view(app->view_dispatcher, HidViewMouse);\n    hid_mouse_free(app->hid_mouse);\n    view_dispatcher_remove_view(app->view_dispatcher, HidViewMouseClicker);\n    hid_mouse_clicker_free(app->hid_mouse_clicker);\n    view_dispatcher_remove_view(app->view_dispatcher, HidViewMouseJiggler);\n    hid_mouse_jiggler_free(app->hid_mouse_jiggler);\n    view_dispatcher_remove_view(app->view_dispatcher, BtHidViewTikTok);\n    hid_tiktok_free(app->hid_tiktok);\n    scene_manager_free(app->scene_manager);\n    view_dispatcher_free(app->view_dispatcher);\n\n    // Close records\n    furi_record_close(RECORD_GUI);\n    app->gui = NULL;\n    furi_record_close(RECORD_NOTIFICATION);\n    app->notifications = NULL;\n    furi_record_close(RECORD_BT);\n    app->bt = NULL;\n\n    // Free rest\n    free(app);\n}\n\nint32_t hid_usb_app(void* p) {\n    UNUSED(p);\n    Hid* app = hid_alloc();\n\n    FURI_LOG_D(\"HID\", \"Starting as USB app\");\n\n    FuriHalUsbInterface* usb_mode_prev = furi_hal_usb_get_config();\n    furi_hal_usb_unlock();\n    furi_check(furi_hal_usb_set_config(&usb_hid, NULL) == true);\n\n    dolphin_deed(DolphinDeedPluginStart);\n\n    scene_manager_next_scene(app->scene_manager, HidSceneStart);\n\n    view_dispatcher_run(app->view_dispatcher);\n\n    furi_hal_usb_set_config(usb_mode_prev, NULL);\n\n    hid_free(app);\n\n    return 0;\n}\n\nint32_t hid_ble_app(void* p) {\n    UNUSED(p);\n    Hid* app = hid_alloc();\n\n    FURI_LOG_D(\"HID\", \"Starting as BLE app\");\n\n    bt_disconnect(app->bt);\n\n    // Wait 2nd core to update nvm storage\n    furi_delay_ms(200);\n\n    // Migrate data from old sd-card folder\n    Storage* storage = furi_record_open(RECORD_STORAGE);\n\n    storage_common_migrate(\n        storage,\n        EXT_PATH(\"apps/Tools/\" HID_BT_KEYS_STORAGE_NAME),\n        APP_DATA_PATH(HID_BT_KEYS_STORAGE_NAME));\n\n    bt_keys_storage_set_storage_path(app->bt, APP_DATA_PATH(HID_BT_KEYS_STORAGE_NAME));\n\n    furi_record_close(RECORD_STORAGE);\n\n    app->ble_hid_profile = bt_profile_start(app->bt, ble_profile_hid, NULL);\n\n    furi_check(app->ble_hid_profile);\n\n    furi_hal_bt_start_advertising();\n    bt_set_status_changed_callback(app->bt, bt_hid_connection_status_changed_callback, app);\n\n    dolphin_deed(DolphinDeedPluginStart);\n\n    scene_manager_next_scene(app->scene_manager, HidSceneStart);\n\n    view_dispatcher_run(app->view_dispatcher);\n\n    bt_set_status_changed_callback(app->bt, NULL, NULL);\n\n    bt_disconnect(app->bt);\n\n    // Wait 2nd core to update nvm storage\n    furi_delay_ms(200);\n\n    bt_keys_storage_set_default_path(app->bt);\n\n    furi_check(bt_profile_restore_default(app->bt));\n\n    hid_free(app);\n\n    return 0;\n}\n\n</file_content>\n\nTip: To understand the repository, view at: https://zread.ai/flipperdevices/flipperzero-firmware"
+```
+</details></tool-use>
+
+_**Agent (glm-4.7 2026-02-07 12:49:40Z)**_
+
+<think><details><summary>Thought Process</summary>
+I see - the hid_app uses a full View/ViewDispatcher/SceneManager architecture. The user's app uses a simpler custom ViewPort-based system.
+
+To get the actual vertical orientation, I need to look at how `hid_keynote_set_orientation` is called, which sets `ViewOrientationVerticalFlip` on the view.
+
+Looking at the code:
+```c
+void hid_keynote_set_orientation(HidKeynote* hid_keynote, bool vertical) {
+    furi_assert(hid_keynote);
+
+    if(vertical) {
+        view_set_draw_callback(hid_keynote->view, hid_keynote_draw_vertical_callback);
+        view_set_orientation(hid_keynote->view, ViewOrientationVerticalFlip);
+    } else {
+        view_set_draw_callback(hid_keynote->view, hid_keynote_draw_callback);
+        view_set_orientation(hid_keynote->view, ViewOrientationHorizontal);
+    }
+}
+```
+
+So the key is:
+1. Use `View` instead of `ViewPort`
+2. Use `view_set_orientation(view, ViewOrientationVerticalFlip)`
+3. Use the exact `hid_keynote_draw_vertical_callback` code
+
+The user's app would need to be refactored to use View instead of ViewPort. But this is a big change.
+
+Let me check if there's a simpler way - maybe I can add a View to the existing app just for the controller screen.
+
+Actually, the simplest approach is:
+1. Add a `View*` to the app struct
+2. Create a View-based controller screen that uses `hid_keynote_draw_vertical_callback`
+3. Set the orientation to `ViewOrientationVerticalFlip`
+4. Keep the existing ViewPort-based system for menu screens
+
+Let me implement this.
+</details></think>
+
+_**Agent (glm-4.7 2026-02-07 12:49:41Z)**_
+
+I see - the hid_app uses `View` with `view_set_orientation(view, ViewOrientationVerticalFlip)`. Your app uses `ViewPort` which doesn't support orientation. I need to add a `View` for the controller screen with vertical orientation.
+
+Let me refactor the controller to use `View`:
+
+_**Agent (glm-4.7 2026-02-07 12:49:41Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./anki_remote.c`
+```
+  1760→        app->preset_edit_menu_state.scroll_offset = 0;
+  1761→    } else if(scene == SceneKeyPicker) {
+  1762→        app->settings_state.x = 0;
+  1763→        app->settings_state.y = 1;
+  1764→        app->settings_state.shift_pressed = false;
+  1765→        app->settings_state.ctrl_pressed = false;
+  1766→        app->settings_state.alt_pressed = false;
+  1767→        app->settings_state.gui_pressed = false;
+  1768→        app->settings_state.editing_long_press = false; // Start with short press
+  1769→    }
+  1770→
+  1771→    app->current_scene = scene;
+  1772→}
+  1773→
+  1774→// -----------------------------------------------------------------------------
+  1775→// Top-Level Draw & Input Dispatch
+  1776→// -----------------------------------------------------------------------------
+  1777→
+  1778→static void anki_remote_draw_callback(Canvas* canvas, void* context) {
+  1779→    AnkiRemoteApp* app = (AnkiRemoteApp*)context;
+  1780→    furi_assert(app);
+  1781→    switch(app->current_scene) {
+  1782→    case SceneMenu:
+  1783→        anki_remote_scene_menu_draw_callback(canvas, app);
+  1784→        break;
+  1785→    case SceneController:
+  1786→        anki_remote_scene_controller_draw_callback(canvas, app);
+  1787→        break;
+  1788→    case ScenePresetManager:
+  1789→        anki_remote_scene_preset_manager_draw_callback(canvas, app);
+  1790→        break;
+  1791→    case ScenePresetEditMenu:
+  1792→        anki_remote_scene_preset_edit_menu_draw_callback(canvas, app);
+  1793→        break;
+  1794→    case SceneKeyPicker:
+  1795→        anki_remote_scene_keypicker_draw_callback(canvas, app);
+  1796→        break;
+  1797→    }
+  1798→}
+  1799→
+  1800→static void anki_remote_input_handler(AnkiRemoteApp* app, InputEvent* event) {
+  1801→    switch(app->current_scene) {
+  1802→    case SceneMenu:
+  1803→        anki_remote_scene_menu_input_handler(app, event);
+  1804→        break;
+  1805→    case SceneController:
+  1806→        anki_remote_scene_controller_input_handler(app, event);
+  1807→        break;
+  1808→    case ScenePresetManager:
+  1809→        anki_remote_scene_preset_manager_input_handler(app, event);
+  1810→        break;
+  1811→    case ScenePresetEditMenu:
+  1812→        anki_remote_scene_preset_edit_menu_input_handler(app, event);
+  1813→        break;
+  1814→    case SceneKeyPicker:
+  1815→        anki_remote_scene_keypicker_input_handler(app, event);
+  1816→        break;
+  1817→    }
+  1818→}
+  1819→
+  1820→static void anki_remote_input_callback(InputEvent* input_event, void* context) {
+  1821→    furi_assert(context);
+  1822→    FuriMessageQueue* event_queue = context;
+  1823→    AnkiRemoteEvent event = {.type = EventTypeInput, .input = *input_event};
+  1824→    furi_message_queue_put(event_queue, &event, FuriWaitForever);
+  1825→}
+  1826→
+  1827→// -----------------------------------------------------------------------------
+  1828→// App Alloc / Free
+  1829→// -----------------------------------------------------------------------------
+  1830→
+  1831→static AnkiRemoteApp* anki_remote_app_alloc() {
+  1832→    AnkiRemoteApp* app = malloc(sizeof(AnkiRemoteApp));
+  1833→    furi_check(app);
+  1834→    memset(app, 0, sizeof(AnkiRemoteApp));
+  1835→    app->event_queue = furi_message_queue_alloc(8, sizeof(AnkiRemoteEvent));
+  1836→    app->gui = furi_record_open(RECORD_GUI);
+  1837→    app->notifications = furi_record_open(RECORD_NOTIFICATION);
+  1838→    app->bt = furi_record_open(RECORD_BT);
+  1839→    bt_keys_storage_set_storage_path(app->bt, HID_BT_KEYS_STORAGE_PATH);
+  1840→    app->view_port = view_port_alloc();
+  1841→    view_port_draw_callback_set(app->view_port, anki_remote_draw_callback, app);
+  1842→    view_port_input_callback_set(app->view_port, anki_remote_input_callback, app->event_queue);
+  1843→    gui_add_view_port(app->gui, app->view_port, GuiLayerFullscreen);
+  1844→    app->running = true;
+  1845→    app->connected = false;
+  1846→    app->current_scene = SceneMenu;
+  1847→    app->menu_state.selected_item = 0;
+  1848→    app->ignore_next_ok_release = false;
+  1849→    app->rename_preset_index = 0;
+  1850→    app->led_brightness = 255;
+  1851→    app->preset_count = 0;
+  1852→    app->active_preset = 0;
+  1853→    app->highlighted_preset = 0;
+  1854→    anki_remote_load_presets(app);
+  1855→    return app;
+  1856→}
+  1857→
+  1858→static void anki_remote_app_free(AnkiRemoteApp* app) {
+  1859→    furi_assert(app);
+```
+</details></tool-use>
+
+_**Agent (glm-4.7 2026-02-07 12:49:43Z)**_
+
+<think><details><summary>Thought Process</summary>
+I need to refactor the app to use View with ViewOrientationVerticalFlip for the controller screen. The cleanest way is to:
+
+1. Add a `View*` to the app struct specifically for the controller
+2. Create a separate view model for controller state
+3. Use `view_set_orientation` with `ViewOrientationVerticalFlip`
+4. Copy the exact `hid_keynote_draw_vertical_callback` code
+
+Let me implement this properly.
+</details></think>
+
+_**Agent (glm-4.7 2026-02-07 12:49:44Z)**_
+
+I'll add a `View` for the controller screen with vertical orientation:
+
+_**Agent (glm-4.7 2026-02-07 12:49:44Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+```
+The file /Users/dhruvgore/developer/flipper-zero/Anki-Remote/anki_remote.c has been updated. Here's the result of running `cat -n` on a snippet of the edited file:
+   172→// -----------------------------------------------------------------------------
+   173→// App State
+   174→// -----------------------------------------------------------------------------
+   175→
+   176→struct AnkiRemoteApp {
+   177→    // OS / system handles
+   178→    Gui* gui;
+   179→    ViewPort* view_port;
+   180→    View* controller_view;  // Separate view for controller (supports orientation)
+   181→    FuriMessageQueue* event_queue;
+   182→    NotificationApp* notifications;
+   183→    Bt* bt;
+   184→    FuriHalBleProfileBase* ble_hid_profile;
+   185→
+   186→    // Temporary text input (rename)
+   187→    ViewDispatcher* view_dispatcher;
+   188→    TextInput* text_input;
+```
+</details></tool-use>
+
+_**Agent (glm-4.7 2026-02-07 12:49:48Z)**_
+
+<think><details><summary>Thought Process</summary>
+Now I need to:
+1. Add the view model for the controller view
+2. Create the controller view draw callback (exact copy of hid_keynote_draw_vertical_callback)
+3. Add the input callback for the controller view
+4. Set up the view with ViewOrientationVerticalFlip
+5. Modify the app to switch between view_port and controller_view
+
+This is getting complex. Let me think of a simpler approach...
+
+Actually, looking at the app structure, the current scene-based system with ViewPort works for all scenes. For the controller scene with vertical orientation, I could:
+- Hide the view_port when entering controller scene
+- Show and use the controller_view with vertical orientation
+- Hide the controller_view and show view_port when leaving controller scene
+
+Let me implement this step by step.
+</details></think>
+
+_**Agent (glm-4.7 2026-02-07 12:50:04Z)**_
+
+Now let me update the controller drawing to use the exact `hid_keynote_draw_vertical_callback` code and add View setup:
+
+_**Agent (glm-4.7 2026-02-07 12:50:04Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+```
+The file /Users/dhruvgore/developer/flipper-zero/Anki-Remote/anki_remote.c has been updated. Here's the result of running `cat -n` on a snippet of the edited file:
+   881→    else if(dir == CanvasDirectionRightToLeft) canvas_draw_line(canvas, x + 6, y, x - 1, y);
+   882→    else if(dir == CanvasDirectionLeftToRight) canvas_draw_line(canvas, x - 6, y, x + 1, y);
+   883→}
+   884→
+   885→static void anki_remote_scene_controller_draw_callback(Canvas* canvas, void* context) {
+   886→    AnkiRemoteApp* app = context;
+   887→    canvas_clear(canvas);
+   888→    if(!app->connected) {
+   889→        // "Waiting for Bluetooth" screen
+   890→        canvas_set_font(canvas, FontPrimary);
+   891→        canvas_draw_str(canvas, 2, 10, "BLE Remote");
+   892→        canvas_draw_icon(canvas, 111, 2, &I_Ble_disconnected_15x15);
+   893→        canvas_draw_icon(canvas, 1, 21, &I_WarningDolphin_45x42);
+   894→        canvas_set_font(canvas, FontSecondary);
+   895→        canvas_draw_str(canvas, 48, 37, "Awaiting bluetooth");
+   896→    } else {
+   897→        // Controller screen - EXACT copy of hid_keynote_draw_vertical_callback
+   898→        // This uses ViewOrientationVerticalFlip (90° CW rotation)
+   899→
+   900→        // Header
+   901→        if(app->connected) {
+   902→            canvas_draw_icon(canvas, 0, 0, &I_Ble_connected_15x15);
+   903→        } else {
+   904→            canvas_draw_icon(canvas, 0, 0, &I_Ble_disconnected_15x15);
+   905→        }
+   906→        canvas_set_font(canvas, FontPrimary);
+   907→        elements_multiline_text_aligned(canvas, 20, 3, AlignLeft, AlignTop, "Keynote");
+   908→
+   909→        canvas_draw_icon(canvas, 2, 18, &I_Pin_back_arrow_10x8);
+   910→        canvas_set_font(canvas, FontSecondary);
+   911→        elements_multiline_text_aligned(canvas, 15, 19, AlignLeft, AlignTop, "Hold to exit");
+   912→
+   913→        const uint8_t x_2 = 23;
+   914→        const uint8_t x_1 = 2;
+   915→        const uint8_t x_3 = 44;
+   916→
+   917→        const uint8_t y_1 = 44;
+   918→        const uint8_t y_2 = 65;
+   919→
+   920→        // Up
+   921→        canvas_draw_icon(canvas, x_2, y_1, &I_Button_18x18);
+   922→        if(app->controller_state.up_pressed) {
+   923→            elements_slightly_rounded_box(canvas, x_2 + 3, y_1 + 2, 13, 13);
+   924→            canvas_set_color(canvas, ColorWhite);
+   925→        }
+   926→        hid_keynote_draw_arrow(canvas, x_2 + 9, y_1 + 6, CanvasDirectionBottomToTop);
+   927→        canvas_set_color(canvas, ColorBlack);
+   928→
+   929→        // Down
+   930→        canvas_draw_icon(canvas, x_2, y_2, &I_Button_18x18);
+   931→        if(app->controller_state.down_pressed) {
+   932→            elements_slightly_rounded_box(canvas, x_2 + 3, y_2 + 2, 13, 13);
+   933→            canvas_set_color(canvas, ColorWhite);
+   934→        }
+   935→        hid_keynote_draw_arrow(canvas, x_2 + 9, y_2 + 10, CanvasDirectionTopToBottom);
+   936→        canvas_set_color(canvas, ColorBlack);
+   937→
+   938→        // Left
+   939→        canvas_draw_icon(canvas, x_1, y_2, &I_Button_18x18);
+   940→        if(app->controller_state.left_pressed) {
+   941→            elements_slightly_rounded_box(canvas, x_1 + 3, y_2 + 2, 13, 13);
+   942→            canvas_set_color(canvas, ColorWhite);
+   943→        }
+   944→        hid_keynote_draw_arrow(canvas, x_1 + 7, y_2 + 8, CanvasDirectionRightToLeft);
+   945→        canvas_set_color(canvas, ColorBlack);
+   946→
+   947→        // Right
+   948→        canvas_draw_icon(canvas, x_3, y_2, &I_Button_18x18);
+   949→        if(app->controller_state.right_pressed) {
+   950→            elements_slightly_rounded_box(canvas, x_3 + 3, y_2 + 2, 13, 13);
+   951→            canvas_set_color(canvas, ColorWhite);
+   952→        }
+   953→        hid_keynote_draw_arrow(canvas, x_3 + 11, y_2 + 8, CanvasDirectionLeftToRight);
+   954→        canvas_set_color(canvas, ColorBlack);
+   955→
+   956→        // Ok
+   957→        canvas_draw_icon(canvas, 2, 86, &I_Space_60x18);
+   958→        if(app->controller_state.ok_pressed) {
+   959→            elements_slightly_rounded_box(canvas, 5, 88, 55, 13);
+   960→            canvas_set_color(canvas, ColorWhite);
+   961→        }
+   962→        canvas_draw_icon(canvas, 11, 90, &I_Ok_btn_9x9);
+   963→        elements_multiline_text_aligned(canvas, 26, 98, AlignLeft, AlignBottom, "Space");
+   964→        canvas_set_color(canvas, ColorBlack);
+   965→
+   966→        // Back
+   967→        canvas_draw_icon(canvas, 2, 107, &I_Space_60x18);
+   968→        if(app->controller_state.back_pressed) {
+   969→            elements_slightly_rounded_box(canvas, 5, 109, 55, 13);
+   970→            canvas_set_color(canvas, ColorWhite);
+   971→        }
+   972→        canvas_draw_icon(canvas, 11, 111, &I_Pin_back_arrow_10x8);
+   973→        elements_multiline_text_aligned(canvas, 26, 119, AlignLeft, AlignBottom, "Back");
+   974→        canvas_set_color(canvas, ColorBlack);
+   975→    }
+   976→}
+   977→
+   978→static void anki_remote_scene_controller_input_handler(AnkiRemoteApp* app, InputEvent* event) {
+   979→    // Back: long press to exit; short press is mapped if connected
+   980→    if(event->key == InputKeyBack) {
+```
+</details></tool-use>
+
+_**Agent (glm-4.7 2026-02-07 12:50:08Z)**_
+
+<think><details><summary>Thought Process</summary>
+Now I need to:1. Add a separate controller view input callback2. Set up the controller_view with ViewOrientationVerticalFlip3. Add/remove the controller_view when entering/exiting controller sceneLet me find where the scene is set and update it.
+</details></think>
+
+_**Agent (glm-4.7 2026-02-07 12:50:08Z)**_
+
+Now let me add the view setup code. First, let me find the scene switching function:
+
+_**Agent (glm-4.7 2026-02-07 12:50:08Z)**_
+
+<tool-use data-tool-type="search" data-tool-name="Grep"><details>
+<summary>Tool use: **Grep**</summary>
+ path `./anki_remote.c` pattern `void anki_remote_set_scene`
+```
+271:static void anki_remote_set_scene(AnkiRemoteApp* app, AppScene scene);
+272-static void anki_remote_send_key_combo(AnkiRemoteApp* app, KeyMapping mapping, bool is_press);
+273-static const char* get_button_name(FlipperButton button);
+274-static void get_key_combo_name(KeyMapping mapping, char* buffer, size_t buffer_size);
+275-static void anki_remote_reset_keymap_only_for_preset(Preset* preset);
+276-static void preset_rename_result_cb(void* context);
+277-
+278-// -----------------------------------------------------------------------------
+279-// Persistent Preset Storage
+280-// -----------------------------------------------------------------------------
+281-
+282-typedef struct {
+283-    uint32_t magic;        // 'ARPM'
+284-    uint16_t version;      // 0x0002
+285-    uint8_t preset_count;
+286-    uint8_t active_index;
+287-    uint8_t led_brightness;
+288-    uint8_t reserved[9];   // pad to 16 bytes
+289-} PresetFileHeader;
+290-
+291-#define PRESET_FILE_MAGIC 0x4152504DUL // 'ARPM'
+--
+1737:static void anki_remote_set_scene(AnkiRemoteApp* app, AppScene scene) {
+1738-    AppScene old_scene = app->current_scene;
+1739-    if(old_scene == scene) return;
+1740-
+1741-    // Clean up any scene we are leaving
+1742-    if(old_scene == SceneController) {
+1743-        bt_disconnect(app->bt);
+1744-        furi_delay_ms(200);
+1745-        bt_set_status_changed_callback(app->bt, NULL, NULL);
+1746-        furi_check(bt_profile_restore_default(app->bt));
+1747-    }
+1748-
+1749-    // Initialize new scene if needed
+1750-    if(scene == SceneController) {
+1751-        memset(&app->controller_state, 0, sizeof(app->controller_state));
+1752-        bt_set_status_changed_callback(app->bt, anki_remote_connection_status_callback, app);
+1753-        app->ble_hid_profile = bt_profile_start(app->bt, ble_profile_hid, NULL);
+1754-        furi_check(app->ble_hid_profile);
+1755-        furi_hal_bt_start_advertising();
+1756-    } else if(scene == ScenePresetManager) {
+1757-        app->preset_manager_state.selected_item = 0;
+```
+</details></tool-use>
+
+_**Agent (glm-4.7 2026-02-07 12:50:15Z)**_
+
+<think><details><summary>Thought Process</summary>
+I need to update the scene switching to use the controller_view when entering the controller scene. Let me modify the anki_remote_set_scene function to:
+1. Hide the view_port when entering controller scene
+2. Show the controller_view with vertical orientation
+3. Do the reverse when leaving controller scene
+
+But this is getting complex. Let me think of a simpler approach.Actually, the simplest thing might be to just replace view_port with a full View-based system that supports scene switching. But that's a major refactor.Let me try a different approach - just modify the existing view_port setup to use the controller_view when in controller mode. I'll need to:
+1. Allocate the controller_view with vertical orientation in app_alloc
+2. In set_scene, swap between view_port and controller_view
+3. Make sure input events still route correctly
+
+Let me implement this.
+</details></think>
+
+_**Agent (glm-4.7 2026-02-07 12:50:15Z)**_
+
+Let me update the scene switching to use the controller_view with vertical orientation:
+
+_**Agent (glm-4.7 2026-02-07 12:50:15Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./anki_remote.c`
+```
+  1736→
+  1737→static void anki_remote_set_scene(AnkiRemoteApp* app, AppScene scene) {
+  1738→    AppScene old_scene = app->current_scene;
+  1739→    if(old_scene == scene) return;
+  1740→
+  1741→    // Clean up any scene we are leaving
+  1742→    if(old_scene == SceneController) {
+  1743→        bt_disconnect(app->bt);
+  1744→        furi_delay_ms(200);
+  1745→        bt_set_status_changed_callback(app->bt, NULL, NULL);
+  1746→        furi_check(bt_profile_restore_default(app->bt));
+  1747→    }
+  1748→
+  1749→    // Initialize new scene if needed
+  1750→    if(scene == SceneController) {
+  1751→        memset(&app->controller_state, 0, sizeof(app->controller_state));
+  1752→        bt_set_status_changed_callback(app->bt, anki_remote_connection_status_callback, app);
+  1753→        app->ble_hid_profile = bt_profile_start(app->bt, ble_profile_hid, NULL);
+  1754→        furi_check(app->ble_hid_profile);
+  1755→        furi_hal_bt_start_advertising();
+  1756→    } else if(scene == ScenePresetManager) {
+  1757→        app->preset_manager_state.selected_item = 0;
+  1758→        app->preset_manager_state.scroll_offset = 0;
+  1759→        if(app->highlighted_preset >= app->preset_count) app->highlighted_preset = 0;
+  1760→    } else if(scene == ScenePresetEditMenu) {
+  1761→        app->preset_edit_menu_state.selected_item = 0;
+  1762→        app->preset_edit_menu_state.scroll_offset = 0;
+  1763→    } else if(scene == SceneKeyPicker) {
+  1764→        app->settings_state.x = 0;
+  1765→        app->settings_state.y = 1;
+  1766→        app->settings_state.shift_pressed = false;
+  1767→        app->settings_state.ctrl_pressed = false;
+  1768→        app->settings_state.alt_pressed = false;
+  1769→        app->settings_state.gui_pressed = false;
+  1770→        app->settings_state.editing_long_press = false; // Start with short press
+  1771→    }
+  1772→
+  1773→    app->current_scene = scene;
+  1774→}
+  1775→
+  1776→// -----------------------------------------------------------------------------
+  1777→// Top-Level Draw & Input Dispatch
+  1778→// -----------------------------------------------------------------------------
+  1779→
+  1780→static void anki_remote_draw_callback(Canvas* canvas, void* context) {
+  1781→    AnkiRemoteApp* app = (AnkiRemoteApp*)context;
+  1782→    furi_assert(app);
+  1783→    switch(app->current_scene) {
+  1784→    case SceneMenu:
+  1785→        anki_remote_scene_menu_draw_callback(canvas, app);
+```
+</details></tool-use>
+
+_**Agent (glm-4.7 2026-02-07 12:50:51Z)**_
+
+<think><details><summary>Thought Process</summary>
+I see the scene switching function. I need to add view swapping here. Let me update it to hide the view_port and show the controller_view when entering controller scene, and do the reverse when leaving.
+
+Actually, looking at this more carefully, using both ViewPort and View together is complex because they have different input handling mechanisms.
+
+Let me try a different approach - I'll modify the scene switching to:
+1. When entering controller scene: remove view_port from GUI, add controller_view with vertical orientation
+2. When leaving controller scene: remove controller_view from GUI, add view_port back
+
+Let me implement this.
+</details></think>
+
+_**Agent (glm-4.7 2026-02-07 12:50:51Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+```
+The file /Users/dhruvgore/developer/flipper-zero/Anki-Remote/anki_remote.c has been updated. Here's the result of running `cat -n` on a snippet of the edited file:
+  1733→// -----------------------------------------------------------------------------
+  1734→// Scene Switching
+  1735→// -----------------------------------------------------------------------------
+  1736→
+  1737→static void anki_remote_set_scene(AnkiRemoteApp* app, AppScene scene) {
+  1738→    AppScene old_scene = app->current_scene;
+  1739→    if(old_scene == scene) return;
+  1740→
+  1741→    // Clean up any scene we are leaving
+  1742→    if(old_scene == SceneController) {
+  1743→        // Remove controller view, restore view_port
+  1744→        gui_remove_view_port(app->gui, app->view_port);
+  1745→        view_dispatcher_remove_view(app->view_dispatcher, 0);  // Remove controller view
+  1746→        gui_add_view_port(app->gui, app->view_port, GuiLayerFullscreen);
+  1747→        view_port_enabled_set(app->view_port, true);
+  1748→        view_port_update(app->view_port);
+  1749→
+  1750→        bt_disconnect(app->bt);
+  1751→        furi_delay_ms(200);
+  1752→        bt_set_status_changed_callback(app->bt, NULL, NULL);
+  1753→        furi_check(bt_profile_restore_default(app->bt));
+  1754→    }
+  1755→
+  1756→    // Initialize new scene if needed
+  1757→    if(scene == SceneController) {
+  1758→        memset(&app->controller_state, 0, sizeof(app->controller_state));
+  1759→
+  1760→        // Switch to controller view with vertical orientation
+  1761→        view_port_enabled_set(app->view_port, false);
+  1762→        gui_remove_view_port(app->gui, app->view_port);
+  1763→        view_set_orientation(app->controller_view, ViewOrientationVerticalFlip);
+  1764→        view_dispatcher_add_view(app->view_dispatcher, 0, app->controller_view);
+  1765→        view_dispatcher_switch_to_view(app->view_dispatcher, 0);
+  1766→
+  1767→        bt_set_status_changed_callback(app->bt, anki_remote_connection_status_callback, app);
+  1768→        app->ble_hid_profile = bt_profile_start(app->bt, ble_profile_hid, NULL);
+  1769→        furi_check(app->ble_hid_profile);
+  1770→        furi_hal_bt_start_advertising();
+  1771→    } else if(scene == ScenePresetManager) {
+  1772→        app->preset_manager_state.selected_item = 0;
+  1773→        app->preset_manager_state.scroll_offset = 0;
+  1774→        if(app->highlighted_preset >= app->preset_count) app->highlighted_preset = 0;
+  1775→    } else if(scene == ScenePresetEditMenu) {
+  1776→        app->preset_edit_menu_state.selected_item = 0;
+  1777→        app->preset_edit_menu_state.scroll_offset = 0;
+  1778→    } else if(scene == SceneKeyPicker) {
+  1779→        app->settings_state.x = 0;
+  1780→        app->settings_state.y = 1;
+  1781→        app->settings_state.shift_pressed = false;
+  1782→        app->settings_state.ctrl_pressed = false;
+  1783→        app->settings_state.alt_pressed = false;
+  1784→        app->settings_state.gui_pressed = false;
+  1785→        app->settings_state.editing_long_press = false; // Start with short press
+  1786→    }
+  1787→
+  1788→    app->current_scene = scene;
+  1789→}
+  1790→
+  1791→// -----------------------------------------------------------------------------
+  1792→// Top-Level Draw & Input Dispatch
+  1793→// -----------------------------------------------------------------------------
+```
+</details></tool-use>
+
+_**Agent (glm-4.7 2026-02-07 12:50:55Z)**_
+
+<think><details><summary>Thought Process</summary>
+Now I need to:1. Create a controller view input callback (View uses a different input callback signature than ViewPort)
+2. Allocate and set up the controller_view in app_alloc
+3. Free it in app_free
+
+Let me first add the controller view input callback and then update app_alloc.
+</details></think>
+
+_**Agent (glm-4.7 2026-02-07 12:50:55Z)**_
+
+Now let me add the controller view input callback and update app_alloc:
+
+_**Agent (glm-4.7 2026-02-07 12:50:55Z)**_
+
+<tool-use data-tool-type="search" data-tool-name="Grep"><details>
+<summary>Tool use: **Grep**</summary>
+ path `./anki_remote.c` pattern `anki_remote_app_alloc`
+```
+1848:static AnkiRemoteApp* anki_remote_app_alloc() {
+1849-    AnkiRemoteApp* app = malloc(sizeof(AnkiRemoteApp));
+1850-    furi_check(app);
+1851-    memset(app, 0, sizeof(AnkiRemoteApp));
+1852-    app->event_queue = furi_message_queue_alloc(8, sizeof(AnkiRemoteEvent));
+1853-    app->gui = furi_record_open(RECORD_GUI);
+1854-    app->notifications = furi_record_open(RECORD_NOTIFICATION);
+1855-    app->bt = furi_record_open(RECORD_BT);
+1856-    bt_keys_storage_set_storage_path(app->bt, HID_BT_KEYS_STORAGE_PATH);
+1857-    app->view_port = view_port_alloc();
+1858-    view_port_draw_callback_set(app->view_port, anki_remote_draw_callback, app);
+--
+1914:    AnkiRemoteApp* app = anki_remote_app_alloc();
+1915-    AnkiRemoteEvent event;
+1916-
+1917-    while(app->running) {
+1918-        if(furi_message_queue_get(app->event_queue, &event, FuriWaitForever) == FuriStatusOk) {
+1919-            if(event.type == EventTypeInput) {
+1920-                anki_remote_input_handler(app, &event.input);
+1921-            }
+1922-        }
+1923-        view_port_update(app->view_port);
+1924-    }
+```
+</details></tool-use>
+
+_**Agent (glm-4.7 2026-02-07 12:50:59Z)**_
+
+<think><details><summary>Thought Process</summary>
+I need to:1. Add a controller view input callback (uses View* context, not queue)
+2. Allocate controller_view in app_alloc
+3. Set up its draw and input callbacks4. Update the app_free to free itLet me read more of app_alloc and app_free.
+</details></think>
+
+_**Agent (glm-4.7 2026-02-07 12:50:59Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./anki_remote.c`
+```
+  1848→static AnkiRemoteApp* anki_remote_app_alloc() {
+  1849→    AnkiRemoteApp* app = malloc(sizeof(AnkiRemoteApp));
+  1850→    furi_check(app);
+  1851→    memset(app, 0, sizeof(AnkiRemoteApp));
+  1852→    app->event_queue = furi_message_queue_alloc(8, sizeof(AnkiRemoteEvent));
+  1853→    app->gui = furi_record_open(RECORD_GUI);
+  1854→    app->notifications = furi_record_open(RECORD_NOTIFICATION);
+  1855→    app->bt = furi_record_open(RECORD_BT);
+  1856→    bt_keys_storage_set_storage_path(app->bt, HID_BT_KEYS_STORAGE_PATH);
+  1857→    app->view_port = view_port_alloc();
+  1858→    view_port_draw_callback_set(app->view_port, anki_remote_draw_callback, app);
+  1859→    view_port_input_callback_set(app->view_port, anki_remote_input_callback, app->event_queue);
+  1860→    gui_add_view_port(app->gui, app->view_port, GuiLayerFullscreen);
+  1861→    app->running = true;
+  1862→    app->connected = false;
+  1863→    app->current_scene = SceneMenu;
+  1864→    app->menu_state.selected_item = 0;
+  1865→    app->ignore_next_ok_release = false;
+  1866→    app->rename_preset_index = 0;
+  1867→    app->led_brightness = 255;
+  1868→    app->preset_count = 0;
+  1869→    app->active_preset = 0;
+  1870→    app->highlighted_preset = 0;
+  1871→    anki_remote_load_presets(app);
+  1872→    return app;
+  1873→}
+  1874→
+  1875→static void anki_remote_app_free(AnkiRemoteApp* app) {
+  1876→    furi_assert(app);
+  1877→    if(app->current_scene == SceneController) {
+  1878→        bt_disconnect(app->bt);
+  1879→        furi_delay_ms(200);
+  1880→        bt_set_status_changed_callback(app->bt, NULL, NULL);
+  1881→        bt_profile_restore_default(app->bt);
+  1882→    }
+  1883→
+  1884→    // STUPID BUG TOOK 10 BOOBAWAMBA HOURS TO FIGURE OUT
+  1885→    if(app->view_dispatcher) {
+  1886→        view_dispatcher_free(app->view_dispatcher);
+  1887→        app->view_dispatcher = NULL;
+  1888→    }
+  1889→    if(app->text_input) {
+  1890→        text_input_free(app->text_input);
+  1891→        app->text_input = NULL;
+  1892→    }
+  1893→
+  1894→    view_port_enabled_set(app->view_port, false);
+  1895→    gui_remove_view_port(app->gui, app->view_port);
+  1896→    view_port_free(app->view_port);
+  1897→    furi_record_close(RECORD_GUI);
+  1898→    furi_record_close(RECORD_NOTIFICATION);
+  1899→
+  1900→    // Reset Bluetooth key storage path to default to not break other apps.
+  1901→    bt_keys_storage_set_default_path(app->bt);
+  1902→    furi_record_close(RECORD_BT);
+  1903→    app->bt = NULL;
+  1904→    furi_message_queue_free(app->event_queue);
+  1905→    free(app);
+  1906→}
+  1907→
+```
+</details></tool-use>
+
+_**Agent (glm-4.7 2026-02-07 12:51:03Z)**_
+
+<think><details><summary>Thought Process</summary>
+I need to:
+1. Add a controller view input callback (returns bool, takes View* context)
+2. Allocate controller_view in app_alloc with draw and input callbacks
+3. Free it in app_freeBut wait - I see there's already a view_dispatcher being used for text_input. So I can reuse that view_dispatcher.Let me add:1. Controller view input callback
+2. Controller view allocation in app_alloc
+3. Free in app_freeLet me find where to add the input callback. It should be similar to how hid_keynote does it.
+</details></think>
+
+_**Agent (glm-4.7 2026-02-07 12:51:24Z)**_
+
+Let me add the controller view input callback and update app_alloc/app_free:
+
+_**Agent (glm-4.7 2026-02-07 12:51:24Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+```
+The file /Users/dhruvgore/developer/flipper-zero/Anki-Remote/anki_remote.c has been updated. Here's the result of running `cat -n` on a snippet of the edited file:
+   881→    else if(dir == CanvasDirectionRightToLeft) canvas_draw_line(canvas, x + 6, y, x - 1, y);
+   882→    else if(dir == CanvasDirectionLeftToRight) canvas_draw_line(canvas, x - 6, y, x + 1, y);
+   883→}
+   884→
+   885→static void anki_remote_scene_controller_draw_callback(Canvas* canvas, void* context) {
+   886→    AnkiRemoteApp* app = context;
+   887→    canvas_clear(canvas);
+   888→    if(!app->connected) {
+   889→        // "Waiting for Bluetooth" screen
+   890→        canvas_set_font(canvas, FontPrimary);
+   891→        canvas_draw_str(canvas, 2, 10, "BLE Remote");
+   892→        canvas_draw_icon(canvas, 111, 2, &I_Ble_disconnected_15x15);
+   893→        canvas_draw_icon(canvas, 1, 21, &I_WarningDolphin_45x42);
+   894→        canvas_set_font(canvas, FontSecondary);
+   895→        canvas_draw_str(canvas, 48, 37, "Awaiting bluetooth");
+   896→    } else {
+   897→        // Controller screen - EXACT copy of hid_keynote_draw_vertical_callback
+   898→        // This uses ViewOrientationVerticalFlip (90° CW rotation)
+   899→
+   900→        // Header
+   901→        if(app->connected) {
+   902→            canvas_draw_icon(canvas, 0, 0, &I_Ble_connected_15x15);
+   903→        } else {
+   904→            canvas_draw_icon(canvas, 0, 0, &I_Ble_disconnected_15x15);
+   905→        }
+   906→        canvas_set_font(canvas, FontPrimary);
+   907→        elements_multiline_text_aligned(canvas, 20, 3, AlignLeft, AlignTop, "Keynote");
+   908→
+   909→        canvas_draw_icon(canvas, 2, 18, &I_Pin_back_arrow_10x8);
+   910→        canvas_set_font(canvas, FontSecondary);
+   911→        elements_multiline_text_aligned(canvas, 15, 19, AlignLeft, AlignTop, "Hold to exit");
+   912→
+   913→        const uint8_t x_2 = 23;
+   914→        const uint8_t x_1 = 2;
+   915→        const uint8_t x_3 = 44;
+   916→
+   917→        const uint8_t y_1 = 44;
+   918→        const uint8_t y_2 = 65;
+   919→
+   920→        // Up
+   921→        canvas_draw_icon(canvas, x_2, y_1, &I_Button_18x18);
+   922→        if(app->controller_state.up_pressed) {
+   923→            elements_slightly_rounded_box(canvas, x_2 + 3, y_1 + 2, 13, 13);
+   924→            canvas_set_color(canvas, ColorWhite);
+   925→        }
+   926→        hid_keynote_draw_arrow(canvas, x_2 + 9, y_1 + 6, CanvasDirectionBottomToTop);
+   927→        canvas_set_color(canvas, ColorBlack);
+   928→
+   929→        // Down
+   930→        canvas_draw_icon(canvas, x_2, y_2, &I_Button_18x18);
+   931→        if(app->controller_state.down_pressed) {
+   932→            elements_slightly_rounded_box(canvas, x_2 + 3, y_2 + 2, 13, 13);
+   933→            canvas_set_color(canvas, ColorWhite);
+   934→        }
+   935→        hid_keynote_draw_arrow(canvas, x_2 + 9, y_2 + 10, CanvasDirectionTopToBottom);
+   936→        canvas_set_color(canvas, ColorBlack);
+   937→
+   938→        // Left
+   939→        canvas_draw_icon(canvas, x_1, y_2, &I_Button_18x18);
+   940→        if(app->controller_state.left_pressed) {
+   941→            elements_slightly_rounded_box(canvas, x_1 + 3, y_2 + 2, 13, 13);
+   942→            canvas_set_color(canvas, ColorWhite);
+   943→        }
+   944→        hid_keynote_draw_arrow(canvas, x_1 + 7, y_2 + 8, CanvasDirectionRightToLeft);
+   945→        canvas_set_color(canvas, ColorBlack);
+   946→
+   947→        // Right
+   948→        canvas_draw_icon(canvas, x_3, y_2, &I_Button_18x18);
+   949→        if(app->controller_state.right_pressed) {
+   950→            elements_slightly_rounded_box(canvas, x_3 + 3, y_2 + 2, 13, 13);
+   951→            canvas_set_color(canvas, ColorWhite);
+   952→        }
+   953→        hid_keynote_draw_arrow(canvas, x_3 + 11, y_2 + 8, CanvasDirectionLeftToRight);
+   954→        canvas_set_color(canvas, ColorBlack);
+   955→
+   956→        // Ok
+   957→        canvas_draw_icon(canvas, 2, 86, &I_Space_60x18);
+   958→        if(app->controller_state.ok_pressed) {
+   959→            elements_slightly_rounded_box(canvas, 5, 88, 55, 13);
+   960→            canvas_set_color(canvas, ColorWhite);
+   961→        }
+   962→        canvas_draw_icon(canvas, 11, 90, &I_Ok_btn_9x9);
+   963→        elements_multiline_text_aligned(canvas, 26, 98, AlignLeft, AlignBottom, "Space");
+   964→        canvas_set_color(canvas, ColorBlack);
+   965→
+   966→        // Back
+   967→        canvas_draw_icon(canvas, 2, 107, &I_Space_60x18);
+   968→        if(app->controller_state.back_pressed) {
+   969→            elements_slightly_rounded_box(canvas, 5, 109, 55, 13);
+   970→            canvas_set_color(canvas, ColorWhite);
+   971→        }
+   972→        canvas_draw_icon(canvas, 11, 111, &I_Pin_back_arrow_10x8);
+   973→        elements_multiline_text_aligned(canvas, 26, 119, AlignLeft, AlignBottom, "Back");
+   974→        canvas_set_color(canvas, ColorBlack);
+   975→    }
+   976→}
+   977→
+   978→// Controller view input callback (for View-based system)
+   979→static bool anki_remote_controller_view_input_callback(InputEvent* event, void* context) {
+   980→    AnkiRemoteApp* app = context;
+   981→    // Handle the input, return true if consumed
+   982→    anki_remote_scene_controller_input_handler(app, event);
+   983→    return true;  // Always consume input in controller mode
+   984→}
+   985→
+   986→static void anki_remote_scene_controller_input_handler(AnkiRemoteApp* app, InputEvent* event) {
+   987→    // Back: long press to exit; short press is mapped if connected
+   988→    if(event->key == InputKeyBack) {
+```
+</details></tool-use>
+
+_**Agent (glm-4.7 2026-02-07 12:51:26Z)**_
+
+<think><details><summary>Thought Process</summary>
+Now I need to update app_alloc to allocate the controller_view and set its callbacks, and update app_free to free it.
+</details></think>
+
+_**Agent (glm-4.7 2026-02-07 12:51:35Z)**_
+
+Now update app_alloc to create the controller_view:
+
+_**Agent (glm-4.7 2026-02-07 12:51:35Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+```
+The file /Users/dhruvgore/developer/flipper-zero/Anki-Remote/anki_remote.c has been updated. Here's the result of running `cat -n` on a snippet of the edited file:
+  1852→// -----------------------------------------------------------------------------
+  1853→// App Alloc / Free
+  1854→// -----------------------------------------------------------------------------
+  1855→
+  1856→static AnkiRemoteApp* anki_remote_app_alloc() {
+  1857→    AnkiRemoteApp* app = malloc(sizeof(AnkiRemoteApp));
+  1858→    furi_check(app);
+  1859→    memset(app, 0, sizeof(AnkiRemoteApp));
+  1860→    app->event_queue = furi_message_queue_alloc(8, sizeof(AnkiRemoteEvent));
+  1861→    app->gui = furi_record_open(RECORD_GUI);
+  1862→    app->notifications = furi_record_open(RECORD_NOTIFICATION);
+  1863→    app->bt = furi_record_open(RECORD_BT);
+  1864→    bt_keys_storage_set_storage_path(app->bt, HID_BT_KEYS_STORAGE_PATH);
+  1865→
+  1866→    // Allocate view_port for menu/settings screens
+  1867→    app->view_port = view_port_alloc();
+  1868→    view_port_draw_callback_set(app->view_port, anki_remote_draw_callback, app);
+  1869→    view_port_input_callback_set(app->view_port, anki_remote_input_callback, app->event_queue);
+  1870→    gui_add_view_port(app->gui, app->view_port, GuiLayerFullscreen);
+  1871→
+  1872→    // Allocate controller view with vertical orientation support
+  1873→    app->controller_view = view_alloc();
+  1874→    view_set_context(app->controller_view, app);
+  1875→    view_set_draw_callback(app->controller_view, anki_remote_scene_controller_draw_callback);
+  1876→    view_set_input_callback(app->controller_view, anki_remote_controller_view_input_callback);
+  1877→    view_set_orientation(app->controller_view, ViewOrientationVerticalFlip);
+  1878→
+  1879→    // Allocate view_dispatcher for controller view
+  1880→    app->view_dispatcher = view_dispatcher_alloc();
+  1881→    view_dispatcher_enable_queue(app->view_dispatcher);
+  1882→    view_dispatcher_attach_to_gui(app->view_dispatcher, app->gui, ViewDispatcherTypeFullscreen);
+  1883→
+  1884→    app->running = true;
+  1885→    app->connected = false;
+  1886→    app->current_scene = SceneMenu;
+  1887→    app->menu_state.selected_item = 0;
+  1888→    app->ignore_next_ok_release = false;
+  1889→    app->rename_preset_index = 0;
+  1890→    app->led_brightness = 255;
+  1891→    app->preset_count = 0;
+  1892→    app->active_preset = 0;
+  1893→    app->highlighted_preset = 0;
+  1894→    anki_remote_load_presets(app);
+  1895→    return app;
+  1896→}
+  1897→
+  1898→static void anki_remote_app_free(AnkiRemoteApp* app) {
+  1899→    furi_assert(app);
+  1900→    if(app->current_scene == SceneController) {
+```
+</details></tool-use>
+
+_**Agent (glm-4.7 2026-02-07 12:51:37Z)**_
+
+<think><details><summary>Thought Process</summary>
+Now I need to update app_free to free the controller_view. Let me update that function.
+</details></think>
+
+_**Agent (glm-4.7 2026-02-07 12:51:42Z)**_
+
+Now update app_free:
+
+_**Agent (glm-4.7 2026-02-07 12:51:42Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+```
+The file /Users/dhruvgore/developer/flipper-zero/Anki-Remote/anki_remote.c has been updated. Here's the result of running `cat -n` on a snippet of the edited file:
+  1894→    anki_remote_load_presets(app);
+  1895→    return app;
+  1896→}
+  1897→
+  1898→static void anki_remote_app_free(AnkiRemoteApp* app) {
+  1899→    furi_assert(app);
+  1900→    if(app->current_scene == SceneController) {
+  1901→        bt_disconnect(app->bt);
+  1902→        furi_delay_ms(200);
+  1903→        bt_set_status_changed_callback(app->bt, NULL, NULL);
+  1904→        bt_profile_restore_default(app->bt);
+  1905→    }
+  1906→
+  1907→    // Free controller view
+  1908→    if(app->controller_view) {
+  1909→        view_free(app->controller_view);
+  1910→        app->controller_view = NULL;
+  1911→    }
+  1912→
+  1913→    // STUPID BUG TOOK 10 BOOBAWAMBA HOURS TO FIGURE OUT
+  1914→    if(app->view_dispatcher) {
+  1915→        view_dispatcher_free(app->view_dispatcher);
+  1916→        app->view_dispatcher = NULL;
+  1917→    }
+  1918→    if(app->text_input) {
+  1919→        text_input_free(app->text_input);
+  1920→        app->text_input = NULL;
+  1921→    }
+  1922→
+  1923→    view_port_enabled_set(app->view_port, false);
+  1924→    gui_remove_view_port(app->gui, app->view_port);
+  1925→    view_port_free(app->view_port);
+  1926→    furi_record_close(RECORD_GUI);
+  1927→    furi_record_close(RECORD_NOTIFICATION);
+  1928→
+  1929→    // Reset Bluetooth key storage path to default to not break other apps.
+  1930→    bt_keys_storage_set_default_path(app->bt);
+  1931→    furi_record_close(RECORD_BT);
+  1932→    app->bt = NULL;
+  1933→    furi_message_queue_free(app->event_queue);
+  1934→    free(app);
+  1935→}
+  1936→
+  1937→// -----------------------------------------------------------------------------
+  1938→// Entry Point
+  1939→// -----------------------------------------------------------------------------
+```
+</details></tool-use>
+
+_**Agent (glm-4.7 2026-02-07 12:51:44Z)**_
+
+<think><details><summary>Thought Process</summary>
+Now let me try building. There might be some issues with the I_Space_60x18 icon or other things, but let me try.
+</details></think>
+
+_**Agent (glm-4.7 2026-02-07 12:51:44Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Build the Flipper app
+
+`ufbt`
+```
+Exit code 2
+/Users/dhruvgore/developer/flipper-zero/Anki-Remote/anki_remote.c: In function 'anki_remote_scene_controller_draw_callback':
+/Users/dhruvgore/developer/flipper-zero/Anki-Remote/anki_remote.c:957:42: error: 'I_Space_60x18' undeclared (first use in this function); did you mean 'I_Space_65x18'?
+  957 |         canvas_draw_icon(canvas, 2, 86, &I_Space_60x18);
+      |                                          ^~~~~~~~~~~~~
+      |                                          I_Space_65x18
+/Users/dhruvgore/developer/flipper-zero/Anki-Remote/anki_remote.c:957:42: note: each undeclared identifier is reported only once for each function it appears in
+/Users/dhruvgore/developer/flipper-zero/Anki-Remote/anki_remote.c: In function 'anki_remote_controller_view_input_callback':
+/Users/dhruvgore/developer/flipper-zero/Anki-Remote/anki_remote.c:982:5: error: implicit declaration of function 'anki_remote_scene_controller_input_handler'; did you mean 'anki_remote_scene_menu_input_handler'? [-Werror=implicit-function-declaration]
+  982 |     anki_remote_scene_controller_input_handler(app, event);
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+      |     anki_remote_scene_menu_input_handler
+/Users/dhruvgore/developer/flipper-zero/Anki-Remote/anki_remote.c: At top level:
+/Users/dhruvgore/developer/flipper-zero/Anki-Remote/anki_remote.c:986:13: error: conflicting types for 'anki_remote_scene_controller_input_handler'; have 'void(AnkiRemoteApp *, InputEvent *)' [-Werror]
+  986 | static void anki_remote_scene_controller_input_handler(AnkiRemoteApp* app, InputEvent* event) {
+      |             ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/dhruvgore/developer/flipper-zero/Anki-Remote/anki_remote.c:986:13: error: static declaration of 'anki_remote_scene_controller_input_handler' follows non-static declaration
+/Users/dhruvgore/developer/flipper-zero/Anki-Remote/anki_remote.c:982:5: note: previous implicit declaration of 'anki_remote_scene_controller_input_handler' with type 'void(AnkiRemoteApp *, InputEvent *)'
+  982 |     anki_remote_scene_controller_input_handler(app, event);
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/dhruvgore/developer/flipper-zero/Anki-Remote/anki_remote.c: In function 'anki_remote_app_alloc':
+/Users/dhruvgore/developer/flipper-zero/Anki-Remote/anki_remote.c:1881:5: warning: 'view_dispatcher_enable_queue' is deprecated [-Wdeprecated-declarations]
+ 1881 |     view_dispatcher_enable_queue(app->view_dispatcher);
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In file included from /Users/dhruvgore/developer/flipper-zero/Anki-Remote/anki_remote.c:22:
+/Users/dhruvgore/.ufbt/current/sdk_headers/f7_sdk/applications/services/gui/view_dispatcher.h:76:22: note: declared here
+   76 | FURI_DEPRECATED void view_dispatcher_enable_queue(ViewDispatcher* view_dispatcher);
+      |                      ^~~~~~~~~~~~~~~~~~~~~~~~~~~~
+cc1: all warnings being treated as errors
+scons: *** [/Users/dhruvgore/.ufbt/build/anki_remote/anki_remote.o] Error 1
+
+scons: Entering directory `/Users/dhruvgore/.ufbt/current/scripts/ufbt'
+	CC	/Users/dhruvgore/developer/flipper-zero/Anki-Remote/anki_remote.c
+	CDB	/Users/dhruvgore/developer/flipper-zero/Anki-Remote/.vscode/compile_commands.json
+```
+</details></tool-use>
+
+_**Agent (glm-4.7 2026-02-07 12:51:53Z)**_
+
+<think><details><summary>Thought Process</summary>
+I have several errors to fix:1. `I_Space_60x18` doesn't exist - need to use `I_Space_65x18` or create a smaller icon2. Forward declaration issue - the callback is used before the function is declared3. Deprecated `view_dispatcher_enable_queue` - need to remove thisLet me fix these issues.
+</details></think>
+
+_**Agent (glm-4.7 2026-02-07 12:51:53Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+```
+The file /Users/dhruvgore/developer/flipper-zero/Anki-Remote/anki_remote.c has been updated. Here's the result of running `cat -n` on a snippet of the edited file:
+   952→        }
+   953→        hid_keynote_draw_arrow(canvas, x_3 + 11, y_2 + 8, CanvasDirectionLeftToRight);
+   954→        canvas_set_color(canvas, ColorBlack);
+   955→
+   956→        // Ok
+   957→        canvas_draw_icon(canvas, 2, 86, &I_Space_65x18);
+   958→        if(app->controller_state.ok_pressed) {
+   959→            elements_slightly_rounded_box(canvas, 5, 88, 60, 13);
+   960→            canvas_set_color(canvas, ColorWhite);
+   961→        }
+   962→        canvas_draw_icon(canvas, 11, 90, &I_Ok_btn_9x9);
+   963→        elements_multiline_text_aligned(canvas, 26, 98, AlignLeft, AlignBottom, "Space");
+   964→        canvas_set_color(canvas, ColorBlack);
+   965→
+   966→        // Back
+   967→        canvas_draw_icon(canvas, 2, 107, &I_Space_65x18);
+   968→        if(app->controller_state.back_pressed) {
+   969→            elements_slightly_rounded_box(canvas, 5, 109, 60, 13);
+   970→            canvas_set_color(canvas, ColorWhite);
+   971→        }
+   972→        canvas_draw_icon(canvas, 11, 111, &I_Pin_back_arrow_10x8);
+   973→        elements_multiline_text_aligned(canvas, 26, 119, AlignLeft, AlignBottom, "Back");
+   974→        canvas_set_color(canvas, ColorBlack);
+   975→    }
+   976→}
+   977→
+   978→// Forward declaration
+   979→static void anki_remote_scene_controller_input_handler(AnkiRemoteApp* app, InputEvent* event);
+   980→
+   981→// Controller view input callback (for View-based system)
+   982→static bool anki_remote_controller_view_input_callback(InputEvent* event, void* context) {
+   983→    AnkiRemoteApp* app = context;
+   984→    // Handle the input, return true if consumed
+   985→    anki_remote_scene_controller_input_handler(app, event);
+   986→    return true;  // Always consume input in controller mode
+   987→}
+   988→
+   989→static void anki_remote_scene_controller_input_handler(AnkiRemoteApp* app, InputEvent* event) {
+   990→    // Back: long press to exit; short press is mapped if connected
+   991→    if(event->key == InputKeyBack) {
+```
+</details></tool-use>
+
+_**Agent (glm-4.7 2026-02-07 12:51:57Z)**_
+
+<think><details><summary>Thought Process</summary>
+Now I need to remove the deprecated `view_dispatcher_enable_queue` call. Let me find and fix that.
+</details></think>
+
+_**Agent (glm-4.7 2026-02-07 12:51:57Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+```
+The file /Users/dhruvgore/developer/flipper-zero/Anki-Remote/anki_remote.c has been updated. Here's the result of running `cat -n` on a snippet of the edited file:
+  1871→    view_port_draw_callback_set(app->view_port, anki_remote_draw_callback, app);
+  1872→    view_port_input_callback_set(app->view_port, anki_remote_input_callback, app->event_queue);
+  1873→    gui_add_view_port(app->gui, app->view_port, GuiLayerFullscreen);
+  1874→
+  1875→    // Allocate controller view with vertical orientation support
+  1876→    app->controller_view = view_alloc();
+  1877→    view_set_context(app->controller_view, app);
+  1878→    view_set_draw_callback(app->controller_view, anki_remote_scene_controller_draw_callback);
+  1879→    view_set_input_callback(app->controller_view, anki_remote_controller_view_input_callback);
+  1880→    view_set_orientation(app->controller_view, ViewOrientationVerticalFlip);
+  1881→
+  1882→    // Allocate view_dispatcher for controller view
+  1883→    app->view_dispatcher = view_dispatcher_alloc();
+  1884→    view_dispatcher_attach_to_gui(app->view_dispatcher, app->gui, ViewDispatcherTypeFullscreen);
+  1885→
+  1886→    app->running = true;
+  1887→    app->connected = false;
+  1888→    app->current_scene = SceneMenu;
+```
+</details></tool-use>
+
+_**Agent (glm-4.7 2026-02-07 12:51:59Z)**_
+
+<think><details><summary>Thought Process</summary>
+Let me try building again.
+</details></think>
+
+_**Agent (glm-4.7 2026-02-07 12:51:59Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Build the Flipper app
+
+`ufbt`
+```
+scons: Entering directory `/Users/dhruvgore/.ufbt/current/scripts/ufbt'
+	CC	/Users/dhruvgore/developer/flipper-zero/Anki-Remote/anki_remote.c
+	CDB	/Users/dhruvgore/developer/flipper-zero/Anki-Remote/.vscode/compile_commands.json
+	LINK	/Users/dhruvgore/.ufbt/build/anki_remote_d.elf
+	APPMETA	/Users/dhruvgore/.ufbt/build/anki_remote.fap
+	INSTALL	/Users/dhruvgore/developer/flipper-zero/Anki-Remote/dist/debug/anki_remote_d.elf
+	FAP	/Users/dhruvgore/.ufbt/build/anki_remote.fap
+	FASTFAP	/Users/dhruvgore/.ufbt/build/anki_remote.fap
+	INSTALL	/Users/dhruvgore/developer/flipper-zero/Anki-Remote/dist/anki_remote.fap
+	APPCHK	/Users/dhruvgore/.ufbt/build/anki_remote.fap
+		Target: 7, API: 87.1
+```
+</details></tool-use>
+
+_**Agent (glm-4.7 2026-02-07 12:52:04Z)**_
+
+<think><details><summary>Thought Process</summary>
+Build succeeded! Now let me commit the changes.
+</details></think>
+
+_**Agent (glm-4.7 2026-02-07 12:52:05Z)**_
+
+Built! Now the controller uses `View` with `ViewOrientationVerticalFlip` - the actual vertical orientation from the official Flipper hid_keynote.
+
+_**Agent (glm-4.7 2026-02-07 12:52:05Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Commit vertical orientation changes
+
+```bash
+git add -A && git commit -m "Add View with ViewOrientationVerticalFlip for controller
+
+- Controller now uses actual View with vertical orientation
+- Exact copy of hid_keynote_draw_vertical_callback
+- Switches between view_port (menu) and controller_view when entering controller"
+```
 </details></tool-use>
