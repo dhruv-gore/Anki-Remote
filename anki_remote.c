@@ -959,9 +959,9 @@ static void anki_remote_scene_controller_draw_callback(Canvas* canvas, void* con
         canvas_set_color(canvas, ColorBlack);
 
         // OK button (Space)
-        canvas_draw_icon(canvas, 2, 86, &I_Space_60x18);
+        canvas_draw_icon(canvas, 2, 86, &I_Space_65x18);
         if(app->controller_state.ok_pressed) {
-            elements_slightly_rounded_box(canvas, 5, 88, 55, 13);
+            elements_slightly_rounded_box(canvas, 5, 88, 60, 13);
             canvas_set_color(canvas, ColorWhite);
         }
         canvas_draw_icon(canvas, 11, 90, &I_Ok_btn_9x9);
@@ -969,9 +969,9 @@ static void anki_remote_scene_controller_draw_callback(Canvas* canvas, void* con
         canvas_set_color(canvas, ColorBlack);
 
         // Back button
-        canvas_draw_icon(canvas, 2, 107, &I_Space_60x18);
+        canvas_draw_icon(canvas, 2, 107, &I_Space_65x18);
         if(app->controller_state.back_pressed) {
-            elements_slightly_rounded_box(canvas, 5, 109, 55, 13);
+            elements_slightly_rounded_box(canvas, 5, 109, 60, 13);
             canvas_set_color(canvas, ColorWhite);
         }
         canvas_draw_icon(canvas, 11, 111, &I_Pin_back_arrow_10x8);
