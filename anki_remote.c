@@ -1751,30 +1751,29 @@ static void anki_remote_set_scene(AnkiRemoteApp* app, AppScene scene) {
 
     // Clean up any scene we are leaving
     if(old_scene == SceneController) {
-        // Remove controller view, restore view_port
-        gui_remove_view_port(app->gui, app->view_port);
-        view_dispatcher_remove_view(app->view_dispatcher, 0);  // Remove controller view
-        gui_add_view_port(app->gui, app->view_port, GuiLayerFullscreen);
-        view_port_enabled_set(app->view_port, true);
-        view_port_update(app->view_port);
-
+        // Disconnect BT and cleanup
         bt_disconnect(app->bt);
         furi_delay_ms(200);
         bt_set_status_changed_callback(app->bt, NULL, NULL);
         furi_check(bt_profile_restore_default(app->bt));
+
+        // Remove controller view, hide it, show view_port
+        view_dispatcher_remove_view(app->view_dispatcher, 0);
+        view_port_enabled_set(app->view_port, true);
+        view_port_update(app->view_port);
     }
 
     // Initialize new scene if needed
     if(scene == SceneController) {
         memset(&app->controller_state, 0, sizeof(app->controller_state));
 
-        // Switch to controller view with vertical orientation
+        // Hide view_port, add and show controller view
         view_port_enabled_set(app->view_port, false);
-        gui_remove_view_port(app->gui, app->view_port);
-        view_set_orientation(app->controller_view, ViewOrientationVerticalFlip);
+
         view_dispatcher_add_view(app->view_dispatcher, 0, app->controller_view);
         view_dispatcher_switch_to_view(app->view_dispatcher, 0);
 
+        // Start BT
         bt_set_status_changed_callback(app->bt, anki_remote_connection_status_callback, app);
         app->ble_hid_profile = bt_profile_start(app->bt, ble_profile_hid, NULL);
         furi_check(app->ble_hid_profile);
@@ -1879,7 +1878,7 @@ static AnkiRemoteApp* anki_remote_app_alloc() {
     view_set_input_callback(app->controller_view, anki_remote_controller_view_input_callback);
     view_set_orientation(app->controller_view, ViewOrientationVerticalFlip);
 
-    // Allocate view_dispatcher for controller view
+    // Allocate view_dispatcher and attach to GUI
     app->view_dispatcher = view_dispatcher_alloc();
     view_dispatcher_attach_to_gui(app->view_dispatcher, app->gui, ViewDispatcherTypeFullscreen);
 
