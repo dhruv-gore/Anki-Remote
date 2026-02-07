@@ -957,23 +957,23 @@ static void anki_remote_view_controller_draw(Canvas* canvas, void* context) {
         canvas_set_color(canvas, ColorBlack);
 
         // Ok (wide button)
-        canvas_draw_icon(canvas, 2, 86, &I_Space_60x18);
+        canvas_draw_icon(canvas, 0, 86, &I_Space_60x18);
         if(app->controller_state.ok_pressed) {
-            elements_slightly_rounded_box(canvas, 5, 88, 55, 13);
+            elements_slightly_rounded_box(canvas, 3, 88, 55, 13);
             canvas_set_color(canvas, ColorWhite);
         }
-        canvas_draw_icon(canvas, 11, 90, &I_Ok_btn_9x9);
-        elements_multiline_text_aligned(canvas, 26, 98, AlignLeft, AlignBottom, "Space");
+        canvas_draw_icon(canvas, 9, 90, &I_Ok_btn_9x9);
+        elements_multiline_text_aligned(canvas, 24, 98, AlignLeft, AlignBottom, "Space");
         canvas_set_color(canvas, ColorBlack);
 
         // Back (wide button)
-        canvas_draw_icon(canvas, 2, 107, &I_Space_60x18);
+        canvas_draw_icon(canvas, 0, 107, &I_Space_60x18);
         if(app->controller_state.back_pressed) {
-            elements_slightly_rounded_box(canvas, 5, 109, 55, 13);
+            elements_slightly_rounded_box(canvas, 3, 109, 55, 13);
             canvas_set_color(canvas, ColorWhite);
         }
-        canvas_draw_icon(canvas, 11, 111, &I_Pin_back_arrow_10x8);
-        elements_multiline_text_aligned(canvas, 26, 119, AlignLeft, AlignBottom, "Back");
+        canvas_draw_icon(canvas, 9, 111, &I_Pin_back_arrow_10x8);
+        elements_multiline_text_aligned(canvas, 24, 119, AlignLeft, AlignBottom, "Back");
         canvas_set_color(canvas, ColorBlack);
     } else if((cw >= 128) && (ch >= 64)) {
         // Horizontal canvas (Keynote, stock HID layout)
