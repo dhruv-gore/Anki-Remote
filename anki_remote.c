@@ -893,69 +893,99 @@ static void anki_remote_scene_controller_draw_callback(Canvas* canvas, void* con
         canvas_set_font(canvas, FontSecondary);
         canvas_draw_str(canvas, 48, 37, "Awaiting bluetooth");
     } else {
-        // Controller screen (Portrait Mode - Rotated 90 CW)
+        // Controller screen (Portrait Mode - Centered Cross)
         
-        // Visual Up (Physical Left) - Drawn on Left side (X=5) pointing Left
-        canvas_draw_icon(canvas, 5, 23, &I_Button_18x18);
-        if(app->controller_state.left_pressed) {
-            elements_slightly_rounded_box(canvas, 8, 25, 13, 13);
-            canvas_set_color(canvas, ColorWhite);
-        }
-        hid_keynote_draw_arrow(canvas, 12, 32, CanvasDirectionRightToLeft);
-        canvas_set_color(canvas, ColorBlack);
+        // --- Row 1: Visual Right (Physical Up) ---
+        // Centered Horizontally (Phys Y), Top of Visual Screen (Phys X=Small)? 
+        // No, in my previous logic, Visual Top was X=0.
+        // But here we want a symmetrical cross.
+        // Let's stick to the physical mapping:
+        // Physical Up -> Visual Right (Arrow pointing Y=0)
+        // Physical Down -> Visual Left (Arrow pointing Y=64)
+        // Physical Left -> Visual Up (Arrow pointing X=0)
+        // Physical Right -> Visual Down (Arrow pointing X=128)
 
-        // Visual Down (Physical Right) - Drawn on Right side (X=45) pointing Right
-        canvas_draw_icon(canvas, 45, 23, &I_Button_18x18);
-        if(app->controller_state.right_pressed) {
-            elements_slightly_rounded_box(canvas, 48, 25, 13, 13);
-            canvas_set_color(canvas, ColorWhite);
-        }
-        hid_keynote_draw_arrow(canvas, 54, 32, CanvasDirectionLeftToRight);
-        canvas_set_color(canvas, ColorBlack);
+        // Center X (Physical) = 64. Center Y (Physical) = 32.
 
-        // Visual Left (Physical Down) - Drawn on Bottom (Y=43) pointing Down
-        canvas_draw_icon(canvas, 25, 43, &I_Button_18x18);
-        if(app->controller_state.down_pressed) {
-            elements_slightly_rounded_box(canvas, 28, 45, 13, 13);
-            canvas_set_color(canvas, ColorWhite);
-        }
-        hid_keynote_draw_arrow(canvas, 34, 53, CanvasDirectionTopToBottom);
-        canvas_set_color(canvas, ColorBlack);
-
-        // Visual Right (Physical Up) - Drawn on Top (Y=3) pointing Up
-        canvas_draw_icon(canvas, 25, 3, &I_Button_18x18);
+        // Visual Right (Phys Up): Top of Phys Screen (Y=small). 
+        // Position: X=55 (Center 64), Y=2.
+        canvas_draw_icon(canvas, 55, 2, &I_Button_18x18);
         if(app->controller_state.up_pressed) {
-            elements_slightly_rounded_box(canvas, 28, 5, 13, 13);
+            elements_slightly_rounded_box(canvas, 58, 4, 13, 13);
             canvas_set_color(canvas, ColorWhite);
         }
-        hid_keynote_draw_arrow(canvas, 34, 9, CanvasDirectionBottomToTop);
+        // Arrow pointing to Y=0 (Visual Right) -> BottomToTop
+        // Button Y=2, Center=11. Arrow Center=11 -> Y_arrow=8.
+        hid_keynote_draw_arrow(canvas, 64, 8, CanvasDirectionBottomToTop);
         canvas_set_color(canvas, ColorBlack);
 
-        // OK Button (Physical OK) - Placed in the remaining space
-        canvas_draw_icon(canvas, 75, 15, &I_Button_18x18);
-        if(app->controller_state.ok_pressed) {
-             elements_slightly_rounded_box(canvas, 78, 17, 13, 13);
-             canvas_set_color(canvas, ColorWhite);
+        // --- Row 2: Visual Up (Phys Left) & Visual Down (Phys Right) ---
+        // Y = 23.
+        
+        // Visual Up (Phys Left): Left of Phys Screen (X=small).
+        // Position: X=30, Y=23.
+        canvas_draw_icon(canvas, 30, 23, &I_Button_18x18);
+        if(app->controller_state.left_pressed) {
+            elements_slightly_rounded_box(canvas, 33, 25, 13, 13);
+            canvas_set_color(canvas, ColorWhite);
         }
-        canvas_draw_icon(canvas, 80, 20, &I_Ok_btn_9x9);
+        // Arrow pointing to X=0 (Visual Up) -> RightToLeft
+        // Button X=30, Center=39. Arrow Center=39.
+        // Button Y=23, Center=32. Arrow Y=32.
+        hid_keynote_draw_arrow(canvas, 37, 32, CanvasDirectionRightToLeft);
+        canvas_set_color(canvas, ColorBlack);
+
+        // Visual Down (Phys Right): Right of Phys Screen (X=large).
+        // Position: X=80, Y=23.
+        canvas_draw_icon(canvas, 80, 23, &I_Button_18x18);
+        if(app->controller_state.right_pressed) {
+            elements_slightly_rounded_box(canvas, 83, 25, 13, 13);
+            canvas_set_color(canvas, ColorWhite);
+        }
+        // Arrow pointing to X=128 (Visual Down) -> LeftToRight
+        // Button X=80, Center=89. Arrow Center=89.
+        hid_keynote_draw_arrow(canvas, 89, 32, CanvasDirectionLeftToRight);
+        canvas_set_color(canvas, ColorBlack);
+
+        // --- Row 3: Visual Left (Phys Down) ---
+        // Y = 44.
+        // Position: X=55, Y=44.
+        canvas_draw_icon(canvas, 55, 44, &I_Button_18x18);
+        if(app->controller_state.down_pressed) {
+            elements_slightly_rounded_box(canvas, 58, 46, 13, 13);
+            canvas_set_color(canvas, ColorWhite);
+        }
+        // Arrow pointing to Y=64 (Visual Left) -> TopToBottom
+        // Button Y=44, Center=53. Arrow Center=53 -> Y_arrow=53.
+        // Wait, TopToBottom: Tip at Y+6? No, line x, y-6 to x, y+1.
+        // Triangle at x, y.
+        // If dir TopToBottom (Pointing Down), triangle base at y-3?
+        // Let's use the standard center calc: Y=53.
+        hid_keynote_draw_arrow(canvas, 64, 53, CanvasDirectionTopToBottom);
+        canvas_set_color(canvas, ColorBlack);
+
+        // --- Extra Buttons ---
+
+        // Back Button (Phys Back): Visual Top-Left (Phys X=small, Y=small?)
+        // Let's put it at X=5, Y=28 (Vertically centered on the D-Pad row 2?)
+        // Or X=5, Y=5.
+        // Let's put it "Above" the Visual Up button (Physically Left of it).
+        // X=5, Y=23.
+        canvas_draw_icon(canvas, 5, 23, &I_Pin_back_arrow_10x8);
+        if(app->controller_state.back_pressed) {
+             // Visual feedback for back button
+             elements_slightly_rounded_box(canvas, 3, 21, 14, 12);
+        }
         canvas_set_color(canvas, ColorBlack);
         
-        // Back Button (Physical Back)
-        canvas_draw_icon(canvas, 75, 40, &I_Button_18x18);
-        if(app->controller_state.back_pressed) {
-             elements_slightly_rounded_box(canvas, 78, 42, 13, 13);
-             canvas_set_color(canvas, ColorWhite);
+        // OK Button (Phys OK): Visual Bottom-Center?
+        // Let's put it at the "Bottom" (Physically Right/Bottom X=105).
+        // Centered Y=32?
+        canvas_draw_icon(canvas, 105, 25, &I_Ok_btn_9x9);
+        if(app->controller_state.ok_pressed) {
+             elements_slightly_rounded_box(canvas, 103, 23, 13, 13);
         }
-        canvas_draw_icon(canvas, 79, 45, &I_Pin_back_arrow_10x8);
         canvas_set_color(canvas, ColorBlack);
-
-        // Show preset name
-        canvas_set_font(canvas, FontSecondary);
-        char title_buf[32];
-        snprintf(title_buf, sizeof(title_buf), "%s", app->presets[app->active_preset].name);
-        // Truncate to avoid overflow
-        if(strlen(title_buf) > 6) title_buf[6] = '\0'; 
-        canvas_draw_str(canvas, 100, 35, title_buf);
     }
 }
 
