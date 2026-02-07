@@ -872,9 +872,18 @@ static void anki_remote_scene_menu_input_handler(AnkiRemoteApp* app, InputEvent*
 // Scene Drawing: Controller
 // -----------------------------------------------------------------------------
 
-// D-pad arrow art: because sometimes you just need triangles.
+// D-pad arrow art - exact copy from Flipper Zero HID app
 static void hid_keynote_draw_arrow(Canvas* canvas, uint8_t x, uint8_t y, CanvasDirection dir) {
     canvas_draw_triangle(canvas, x, y, 5, 3, dir);
+    if(dir == CanvasDirectionBottomToTop) {
+        canvas_draw_line(canvas, x, y + 6, x, y - 1);
+    } else if(dir == CanvasDirectionTopToBottom) {
+        canvas_draw_line(canvas, x, y - 6, x, y + 1);
+    } else if(dir == CanvasDirectionRightToLeft) {
+        canvas_draw_line(canvas, x + 6, y, x - 1, y);
+    } else if(dir == CanvasDirectionLeftToRight) {
+        canvas_draw_line(canvas, x - 6, y, x + 1, y);
+    }
 }
 
 static void anki_remote_scene_controller_draw_callback(Canvas* canvas, void* context) {
@@ -889,8 +898,10 @@ static void anki_remote_scene_controller_draw_callback(Canvas* canvas, void* con
         canvas_set_font(canvas, FontSecondary);
         canvas_draw_str(canvas, 48, 37, "Awaiting bluetooth");
     } else {
-        // Controller screen - Vertical layout (manual 90° rotation of coordinates)
-        // BLE icon (rotated position)
+        // Controller screen - Keynote Vertical layout (from Flipper Zero HID app)
+        // Exact copy of hid_keynote_draw_vertical_callback
+
+        // Header - BLE icon and title
         if(app->connected) {
             canvas_draw_icon(canvas, 0, 0, &I_Ble_connected_15x15);
         } else {
@@ -903,64 +914,68 @@ static void anki_remote_scene_controller_draw_callback(Canvas* canvas, void* con
         canvas_set_font(canvas, FontSecondary);
         elements_multiline_text_aligned(canvas, 15, 19, AlignLeft, AlignTop, "Hold to exit");
 
-        // Vertical T-layout coordinates (manually rotated 90° clockwise for 128x64 screen)
-        // Original vertical: x_2=23, x_1=2, x_3=44, y_1=44, y_2=65
-        // After rotation: swap x/y and adjust
+        // Button layout coordinates (exactly as in Flipper Zero firmware)
+        const uint8_t x_2 = 23;
+        const uint8_t x_1 = 2;
+        const uint8_t x_3 = 44;
 
-        // Up (top of T) - appears on left side
-        canvas_draw_icon(canvas, 44, 2, &I_Button_18x18);
+        const uint8_t y_1 = 44;
+        const uint8_t y_2 = 65;
+
+        // Up button
+        canvas_draw_icon(canvas, x_2, y_1, &I_Button_18x18);
         if(app->controller_state.up_pressed) {
-            elements_slightly_rounded_box(canvas, 47, 4, 13, 13);
+            elements_slightly_rounded_box(canvas, x_2 + 3, y_1 + 2, 13, 13);
             canvas_set_color(canvas, ColorWhite);
         }
-        hid_keynote_draw_arrow(canvas, 53, 8, CanvasDirectionRightToLeft);
+        hid_keynote_draw_arrow(canvas, x_2 + 9, y_1 + 6, CanvasDirectionBottomToTop);
         canvas_set_color(canvas, ColorBlack);
 
-        // Left (left of bottom row) - appears at top
-        canvas_draw_icon(canvas, 44, 21, &I_Button_18x18);
-        if(app->controller_state.left_pressed) {
-            elements_slightly_rounded_box(canvas, 47, 23, 13, 13);
-            canvas_set_color(canvas, ColorWhite);
-        }
-        hid_keynote_draw_arrow(canvas, 53, 29, CanvasDirectionBottomToTop);
-        canvas_set_color(canvas, ColorBlack);
-
-        // Down (center of bottom row) - appears on left side, below up
-        canvas_draw_icon(canvas, 23, 21, &I_Button_18x18);
+        // Down button
+        canvas_draw_icon(canvas, x_2, y_2, &I_Button_18x18);
         if(app->controller_state.down_pressed) {
-            elements_slightly_rounded_box(canvas, 26, 23, 13, 13);
+            elements_slightly_rounded_box(canvas, x_2 + 3, y_2 + 2, 13, 13);
             canvas_set_color(canvas, ColorWhite);
         }
-        hid_keynote_draw_arrow(canvas, 29, 29, CanvasDirectionBottomToTop);
+        hid_keynote_draw_arrow(canvas, x_2 + 9, y_2 + 10, CanvasDirectionTopToBottom);
         canvas_set_color(canvas, ColorBlack);
 
-        // Right (right of bottom row) - appears on left side, below down
-        canvas_draw_icon(canvas, 2, 21, &I_Button_18x18);
+        // Left button
+        canvas_draw_icon(canvas, x_1, y_2, &I_Button_18x18);
+        if(app->controller_state.left_pressed) {
+            elements_slightly_rounded_box(canvas, x_1 + 3, y_2 + 2, 13, 13);
+            canvas_set_color(canvas, ColorWhite);
+        }
+        hid_keynote_draw_arrow(canvas, x_1 + 7, y_2 + 8, CanvasDirectionRightToLeft);
+        canvas_set_color(canvas, ColorBlack);
+
+        // Right button
+        canvas_draw_icon(canvas, x_3, y_2, &I_Button_18x18);
         if(app->controller_state.right_pressed) {
-            elements_slightly_rounded_box(canvas, 5, 23, 13, 13);
+            elements_slightly_rounded_box(canvas, x_3 + 3, y_2 + 2, 13, 13);
             canvas_set_color(canvas, ColorWhite);
         }
-        hid_keynote_draw_arrow(canvas, 7, 29, CanvasDirectionBottomToTop);
+        hid_keynote_draw_arrow(canvas, x_3 + 11, y_2 + 8, CanvasDirectionLeftToRight);
         canvas_set_color(canvas, ColorBlack);
 
-        // OK - appears at bottom left
-        canvas_draw_icon(canvas, 2, 44, &I_Space_65x18);
+        // OK button (Space)
+        canvas_draw_icon(canvas, 2, 86, &I_Space_60x18);
         if(app->controller_state.ok_pressed) {
-            elements_slightly_rounded_box(canvas, 5, 46, 60, 13);
+            elements_slightly_rounded_box(canvas, 5, 88, 55, 13);
             canvas_set_color(canvas, ColorWhite);
         }
-        canvas_draw_icon(canvas, 11, 48, &I_Ok_btn_9x9);
-        elements_multiline_text_aligned(canvas, 26, 56, AlignLeft, AlignBottom, "Space");
+        canvas_draw_icon(canvas, 11, 90, &I_Ok_btn_9x9);
+        elements_multiline_text_aligned(canvas, 26, 98, AlignLeft, AlignBottom, "Space");
         canvas_set_color(canvas, ColorBlack);
 
-        // Back - appears below OK
-        canvas_draw_icon(canvas, 70, 44, &I_Space_65x18);
+        // Back button
+        canvas_draw_icon(canvas, 2, 107, &I_Space_60x18);
         if(app->controller_state.back_pressed) {
-            elements_slightly_rounded_box(canvas, 73, 46, 49, 13);
+            elements_slightly_rounded_box(canvas, 5, 109, 55, 13);
             canvas_set_color(canvas, ColorWhite);
         }
-        canvas_draw_icon(canvas, 76, 50, &I_Pin_back_arrow_10x8);
-        elements_multiline_text_aligned(canvas, 91, 58, AlignLeft, AlignBottom, "Back");
+        canvas_draw_icon(canvas, 11, 111, &I_Pin_back_arrow_10x8);
+        elements_multiline_text_aligned(canvas, 26, 119, AlignLeft, AlignBottom, "Back");
         canvas_set_color(canvas, ColorBlack);
     }
 }
