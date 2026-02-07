@@ -14159,4 +14159,478 @@ ufbt && git add -A && git commit -m "Use official Flipper T-layout for controlle
 - T-shaped d-pad: Up on top, Left/Down/Right on bottom row
 - OK and Back buttons on right side"
 ```
+```
+scons: Entering directory `/Users/dhruvgore/.ufbt/current/scripts/ufbt'
+	CC	/Users/dhruvgore/developer/flipper-zero/Anki-Remote/anki_remote.c
+	CDB	/Users/dhruvgore/developer/flipper-zero/Anki-Remote/.vscode/compile_commands.json
+	LINK	/Users/dhruvgore/.ufbt/build/anki_remote_d.elf
+	INSTALL	/Users/dhruvgore/developer/flipper-zero/Anki-Remote/dist/debug/anki_remote_d.elf
+	APPMETA	/Users/dhruvgore/.ufbt/build/anki_remote.fap
+	FAP	/Users/dhruvgore/.ufbt/build/anki_remote.fap
+	FASTFAP	/Users/dhruvgore/.ufbt/build/anki_remote.fap
+	INSTALL	/Users/dhruvgore/developer/flipper-zero/Anki-Remote/dist/anki_remote.fap
+	APPCHK	/Users/dhruvgore/.ufbt/build/anki_remote.fap
+		Target: 7, API: 87.1
+[main 24b3be3] Use official Flipper T-layout for controller
+ 2 files changed, 614 insertions(+), 71 deletions(-)
+```
+</details></tool-use>
+
+_**Agent (glm-4.7 2026-02-07 12:40:59Z)**_
+
+<think><details><summary>Thought Process</summary>
+Done. Built and committed the official T-layout from the Flipper firmware.
+</details></think>
+
+_**Agent (glm-4.7 2026-02-07 12:41:00Z)**_
+
+Done. Updated to use the official Flipper T-layout (from `hid_keynote_draw_vertical_callback`):
+
+```
+    ↑
+←  ↓  →    OK/Back on right
+```
+
+`.fap` ready at `/Users/dhruvgore/developer/flipper-zero/Anki-Remote/dist/anki_remote.fap`
+
+---
+
+_**User (2026-02-07 12:42:37Z)**_
+
+nope you didn't like completely identifcally copy the keybote draw vertical i'm pretty sure, doesn't look identical at all
+
+---
+
+_**Agent (glm-4.7 2026-02-07 12:42:43Z)**_
+
+<think><details><summary>Thought Process</summary>
+The user is right - I didn't exactly copy the `hid_keynote_draw_vertical_callback` function. Let me look at the official code again and copy it exactly.
+
+From the official code:
+```c
+static void hid_keynote_draw_vertical_callback(Canvas* canvas, void* context) {
+    furi_assert(context);
+    HidKeynoteModel* model = context;
+
+    // Header
+#ifdef HID_TRANSPORT_BLE
+    if(model->connected) {
+        canvas_draw_icon(canvas, 0, 0, &I_Ble_connected_15x15);
+    } else {
+        canvas_draw_icon(canvas, 0, 0, &I_Ble_disconnected_15x15);
+    }
+    canvas_set_font(canvas, FontPrimary);
+    elements_multiline_text_aligned(canvas, 20, 3, AlignLeft, AlignTop, "Keynote");
+#else
+    canvas_set_font(canvas, FontPrimary);
+    elements_multiline_text_aligned(canvas, 12, 3, AlignLeft, AlignTop, "Keynote");
+#endif
+
+    canvas_draw_icon(canvas, 2, 18, &I_Pin_back_arrow_10x8);
+    canvas_set_font(canvas, FontSecondary);
+    elements_multiline_text_aligned(canvas, 15, 19, AlignLeft, AlignTop, "Hold to exit");
+
+    const uint8_t x_2 = 23;
+    const uint8_t x_1 = 2;
+    const uint8_t x_3 = 44;
+
+    const uint8_t y_1 = 44;
+    const uint8_t y_2 = 65;
+
+
+```
+
+I'm continuing the button rendering details for the Up button, focusing on its icon placement and interaction state. The code draws the Up button at a specific coordinate and applies visual feedback when pressed, creating a white rounded box overlay to indicate the button's active state.
+
+For the Down button, I render the button icon and apply similar pressed state styling, ensuring consistent visual interaction across different button controls. The arrow drawing function helps create directional indicators for each button.
+
+The Back button receives an icon with a slight horizontal offset and has its own rounded box styling when pressed. I'll add text alignment to complete the button's visual presentation.
+
+```
+Canvas rendering involves precise coordinate positioning and state-dependent visual styling to create an intuitive user interface.
+```
+</details></think>
+
+_**Agent (glm-4.7 2026-02-07 12:42:56Z)**_
+
+You're right, let me copy it exactly:
+
+_**Agent (glm-4.7 2026-02-07 12:42:56Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+```
+The file /Users/dhruvgore/developer/flipper-zero/Anki-Remote/anki_remote.c has been updated. Here's the result of running `cat -n` on a snippet of the edited file:
+   880→    else if(dir == CanvasDirectionRightToLeft) canvas_draw_line(canvas, x + 6, y, x - 1, y);
+   881→    else if(dir == CanvasDirectionLeftToRight) canvas_draw_line(canvas, x - 6, y, x + 1, y);
+   882→}
+   883→
+   884→static void anki_remote_scene_controller_draw_callback(Canvas* canvas, void* context) {
+   885→    AnkiRemoteApp* app = context;
+   886→    canvas_clear(canvas);
+   887→    if(!app->connected) {
+   888→        // "Waiting for Bluetooth" screen
+   889→        canvas_set_font(canvas, FontPrimary);
+   890→        canvas_draw_str(canvas, 2, 10, "BLE Remote");
+   891→        canvas_draw_icon(canvas, 111, 2, &I_Ble_disconnected_15x15);
+   892→        canvas_draw_icon(canvas, 1, 21, &I_WarningDolphin_45x42);
+   893→        canvas_set_font(canvas, FontSecondary);
+   894→        canvas_draw_str(canvas, 48, 37, "Awaiting bluetooth");
+   895→    } else {
+   896→        // Controller screen - Official Flipper vertical layout (exact copy from hid_keynote_draw_vertical_callback)
+   897→
+   898→        // Header - BLE icon and title
+   899→        if(app->connected) {
+   900→            canvas_draw_icon(canvas, 0, 0, &I_Ble_connected_15x15);
+   901→        } else {
+   902→            canvas_draw_icon(canvas, 0, 0, &I_Ble_disconnected_15x15);
+   903→        }
+   904→        canvas_set_font(canvas, FontPrimary);
+   905→        elements_multiline_text_aligned(canvas, 20, 3, AlignLeft, AlignTop, "Keynote");
+   906→
+   907→        canvas_draw_icon(canvas, 2, 18, &I_Pin_back_arrow_10x8);
+   908→        canvas_set_font(canvas, FontSecondary);
+   909→        elements_multiline_text_aligned(canvas, 15, 19, AlignLeft, AlignTop, "Hold to exit");
+   910→
+   911→        const uint8_t x_2 = 23;
+   912→        const uint8_t x_1 = 2;
+   913→        const uint8_t x_3 = 44;
+   914→
+   915→        const uint8_t y_1 = 44;
+   916→        const uint8_t y_2 = 65;
+   917→
+   918→        // Up
+   919→        canvas_draw_icon(canvas, x_2, y_1, &I_Button_18x18);
+   920→        if(app->controller_state.up_pressed) {
+   921→            elements_slightly_rounded_box(canvas, x_2 + 3, y_1 + 2, 13, 13);
+   922→            canvas_set_color(canvas, ColorWhite);
+   923→        }
+   924→        hid_keynote_draw_arrow(canvas, x_2 + 9, y_1 + 6, CanvasDirectionBottomToTop);
+   925→        canvas_set_color(canvas, ColorBlack);
+   926→
+   927→        // Down
+   928→        canvas_draw_icon(canvas, x_2, y_2, &I_Button_18x18);
+   929→        if(app->controller_state.down_pressed) {
+   930→            elements_slightly_rounded_box(canvas, x_2 + 3, y_2 + 2, 13, 13);
+   931→            canvas_set_color(canvas, ColorWhite);
+   932→        }
+   933→        hid_keynote_draw_arrow(canvas, x_2 + 9, y_2 + 10, CanvasDirectionTopToBottom);
+   934→        canvas_set_color(canvas, ColorBlack);
+   935→
+   936→        // Left
+   937→        canvas_draw_icon(canvas, x_1, y_2, &I_Button_18x18);
+   938→        if(app->controller_state.left_pressed) {
+   939→            elements_slightly_rounded_box(canvas, x_1 + 3, y_2 + 2, 13, 13);
+   940→            canvas_set_color(canvas, ColorWhite);
+   941→        }
+   942→        hid_keynote_draw_arrow(canvas, x_1 + 7, y_2 + 8, CanvasDirectionRightToLeft);
+   943→        canvas_set_color(canvas, ColorBlack);
+   944→
+   945→        // Right
+   946→        canvas_draw_icon(canvas, x_3, y_2, &I_Button_18x18);
+   947→        if(app->controller_state.right_pressed) {
+   948→            elements_slightly_rounded_box(canvas, x_3 + 3, y_2 + 2, 13, 13);
+   949→            canvas_set_color(canvas, ColorWhite);
+   950→        }
+   951→        hid_keynote_draw_arrow(canvas, x_3 + 11, y_2 + 8, CanvasDirectionLeftToRight);
+   952→        canvas_set_color(canvas, ColorBlack);
+   953→
+   954→        // Ok
+   955→        canvas_draw_icon(canvas, 2, 86, &I_Space_60x18);
+   956→        if(app->controller_state.ok_pressed) {
+   957→            elements_slightly_rounded_box(canvas, 5, 88, 55, 13);
+   958→            canvas_set_color(canvas, ColorWhite);
+   959→        }
+   960→        canvas_draw_icon(canvas, 11, 90, &I_Ok_btn_9x9);
+   961→        elements_multiline_text_aligned(canvas, 26, 98, AlignLeft, AlignBottom, "Space");
+   962→        canvas_set_color(canvas, ColorBlack);
+   963→
+   964→        // Back
+   965→        canvas_draw_icon(canvas, 2, 107, &I_Space_60x18);
+   966→        if(app->controller_state.back_pressed) {
+   967→            elements_slightly_rounded_box(canvas, 5, 109, 55, 13);
+   968→            canvas_set_color(canvas, ColorWhite);
+   969→        }
+   970→        canvas_draw_icon(canvas, 11, 111, &I_Pin_back_arrow_10x8);
+   971→        elements_multiline_text_aligned(canvas, 26, 119, AlignLeft, AlignBottom, "Back");
+   972→    }
+   973→}
+   974→
+   975→static void anki_remote_scene_controller_input_handler(AnkiRemoteApp* app, InputEvent* event) {
+   976→    // Back: long press to exit; short press is mapped if connected
+   977→    if(event->key == InputKeyBack) {
+```
+</details></tool-use>
+
+_**Agent (glm-4.7 2026-02-07 12:42:59Z)**_
+
+<think><details><summary>Thought Process</summary>
+Now let me check if the user has the `I_Space_60x18` icon and `I_Ble_connected_15x15` icon. Let me check what icons they have available.
+</details></think>
+
+_**Agent (glm-4.7 2026-02-07 12:42:59Z)**_
+
+<tool-use data-tool-type="search" data-tool-name="Glob"><details>
+<summary>Tool use: **Glob**</summary>
+ path `./` pattern `anki_remote_icons.h`
+```
+No files found
+```
+</details></tool-use>
+
+_**Agent (glm-4.7 2026-02-07 12:43:01Z)**_
+
+<think><details><summary>Thought Process</summary>
+Let me check what icons they have in their project.
+</details></think>
+
+_**Agent (glm-4.7 2026-02-07 12:43:01Z)**_
+
+<tool-use data-tool-type="search" data-tool-name="Glob"><details>
+<summary>Tool use: **Glob**</summary>
+ path `./` pattern `*.h`
+```
+No files found
+```
+</details></tool-use>
+
+_**Agent (glm-4.7 2026-02-07 12:43:05Z)**_
+
+<think><details><summary>Thought Process</summary>
+Hmm, the header files might not be visible because they're generated. Let me check the icons file name in the code.
+</details></think>
+
+_**Agent (glm-4.7 2026-02-07 12:43:05Z)**_
+
+<tool-use data-tool-type="search" data-tool-name="Grep"><details>
+<summary>Tool use: **Grep**</summary>
+ path `./anki_remote.c` pattern `anki_remote_icons`
+```
+25:#include "anki_remote_icons.h"
+```
+</details></tool-use>
+
+_**Agent (glm-4.7 2026-02-07 12:43:08Z)**_
+
+<think><details><summary>Thought Process</summary>
+Let me check what icons are available by looking at what's used in the code currently, and what the user has available.
+</details></think>
+
+_**Agent (glm-4.7 2026-02-07 12:43:08Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+List files in project
+
+`ls -la /Users/dhruvgore/developer/flipper-zero/Anki-Remote/`
+```
+drwxr-xr-x@    - dhruvgore  7 Feb 23:40 .git
+drwxr-xr-x@    - dhruvgore  7 Feb 22:34 .github
+drwxr-xr-x@    - dhruvgore  7 Feb 22:34 .specstory
+drwxr-xr-x@    - dhruvgore  7 Feb 22:49 .vscode
+drwxr-xr-x@    - dhruvgore  7 Feb 23:40 dist
+drwxr-xr-x@    - dhruvgore  7 Feb 22:34 docs
+drwxr-xr-x@    - dhruvgore  7 Feb 22:34 images
+drwxr-xr-x@    - dhruvgore  7 Feb 22:34 screenshots
+.rw-r--r--@  86k dhruvgore  7 Feb 23:42 anki_remote.c
+.rw-r--r--@  144 dhruvgore  7 Feb 22:34 anki_remote.png
+.rw-r--r--@  650 dhruvgore  7 Feb 22:34 application.fam
+.rw-r--r--@  35k dhruvgore  7 Feb 22:34 LICENSE
+.rw-r--r--@ 1.8k dhruvgore  7 Feb 22:34 README.md
+```
+</details></tool-use>
+
+_**Agent (glm-4.7 2026-02-07 12:43:10Z)**_
+
+<think><details><summary>Thought Process</summary>
+Let me check the images folder to see what icons are available.
+</details></think>
+
+_**Agent (glm-4.7 2026-02-07 12:43:10Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+List icon images
+
+`ls -la /Users/dhruvgore/developer/flipper-zero/Anki-Remote/images/`
+```
+.rw-r--r--@    0 dhruvgore  7 Feb 22:34 .gitkeep
+.rw-r--r--@  100 dhruvgore  7 Feb 22:34 Alt_17x10.png
+.rw-r--r--@   93 dhruvgore  7 Feb 22:34 Alt_active_17x9.png
+.rw-r--r--@   85 dhruvgore  7 Feb 22:34 apostrophe_button_9x11.png
+.rw-r--r--@   90 dhruvgore  7 Feb 22:34 backslash_button_9x11.png
+.rw-r--r--@  105 dhruvgore  7 Feb 22:34 backspace_19x11.png
+.rw-r--r--@   94 dhruvgore  7 Feb 22:34 backspace_hovered_9x11.png
+.rw-r--r--@   84 dhruvgore  7 Feb 22:34 backtick_button_9x11.png
+.rw-r--r--@  111 dhruvgore  7 Feb 22:34 Ble_connected_15x15.png
+.rw-r--r--@  113 dhruvgore  7 Feb 22:34 Ble_disconnected_15x15.png
+.rw-r--r--@   92 dhruvgore  7 Feb 22:34 brace_left_button_9x11.png
+.rw-r--r--@   92 dhruvgore  7 Feb 22:34 brace_right_button_9x11.png
+.rw-r--r--@   96 dhruvgore  7 Feb 22:34 Button_18x18.png
+.rw-r--r--@   73 dhruvgore  7 Feb 22:34 ButtonDown_7x4.png
+.rw-r--r--@   81 dhruvgore  7 Feb 22:34 ButtonF1_5x8.png
+.rw-r--r--@   81 dhruvgore  7 Feb 22:34 ButtonF2_5x8.png
+.rw-r--r--@   81 dhruvgore  7 Feb 22:34 ButtonF3_5x8.png
+.rw-r--r--@   81 dhruvgore  7 Feb 22:34 ButtonF4_5x8.png
+.rw-r--r--@   81 dhruvgore  7 Feb 22:34 ButtonF5_5x8.png
+.rw-r--r--@   81 dhruvgore  7 Feb 22:34 ButtonF6_5x8.png
+.rw-r--r--@   81 dhruvgore  7 Feb 22:34 ButtonF7_5x8.png
+.rw-r--r--@   81 dhruvgore  7 Feb 22:34 ButtonF8_5x8.png
+.rw-r--r--@   81 dhruvgore  7 Feb 22:34 ButtonF9_5x8.png
+.rw-r--r--@   81 dhruvgore  7 Feb 22:34 ButtonF10_5x8.png
+.rw-r--r--@   81 dhruvgore  7 Feb 22:34 ButtonF11_5x8.png
+.rw-r--r--@   81 dhruvgore  7 Feb 22:34 ButtonF12_5x8.png
+.rw-r--r--@   79 dhruvgore  7 Feb 22:34 ButtonLeft_4x7.png
+.rw-r--r--@   79 dhruvgore  7 Feb 22:34 ButtonRight_4x7.png
+.rw-r--r--@   73 dhruvgore  7 Feb 22:34 ButtonUp_7x4.png
+.rw-r--r--@  102 dhruvgore  7 Feb 22:34 Cmd_17x10.png
+.rw-r--r--@   96 dhruvgore  7 Feb 22:34 Cmd_active_17x9.png
+.rw-r--r--@  102 dhruvgore  7 Feb 22:34 Ctrl_17x10.png
+.rw-r--r--@   96 dhruvgore  7 Feb 22:34 Ctrl_active_17x9.png
+.rw-r--r--@  101 dhruvgore  7 Feb 22:34 Del_17x10.png
+.rw-r--r--@   80 dhruvgore  7 Feb 22:34 equals_button_9x11.png
+.rw-r--r--@  106 dhruvgore  7 Feb 22:34 Esc_17x10.png
+.rw-r--r--@   88 dhruvgore  7 Feb 22:34 hash_button_9x11.png
+.rw-r--r--@   92 dhruvgore  7 Feb 22:34 Ok_btn_9x9.png
+.rw-r--r--@   98 dhruvgore  7 Feb 22:34 percent_button_9x11.png
+.rw-r--r--@   90 dhruvgore  7 Feb 22:34 Pin_back_arrow_10x8.png
+.rw-r--r--@   85 dhruvgore  7 Feb 22:34 quote_button_9x11.png
+.rw-r--r--@   86 dhruvgore  7 Feb 22:34 Return_10x7.png
+.rw-r--r--@   84 dhruvgore  7 Feb 22:34 Shift_active_7x9.png
+.rw-r--r--@   83 dhruvgore  7 Feb 22:34 Shift_inactive_7x9.png
+.rw-r--r--@   90 dhruvgore  7 Feb 22:34 slash_button_9x11.png
+.rw-r--r--@  112 dhruvgore  7 Feb 22:34 Space_65x18.png
+.rw-r--r--@   89 dhruvgore  7 Feb 22:34 sq_bracket_left_button_9x11.png
+.rw-r--r--@   89 dhruvgore  7 Feb 22:34 sq_bracket_right_button_9x11.png
+.rw-r--r--@  101 dhruvgore  7 Feb 22:34 Tab_17x10.png
+.rw-r--r--@   81 dhruvgore  7 Feb 22:34 underscore_button_9x11.png
+.rw-r--r--@ 1.1k dhruvgore  7 Feb 22:34 WarningDolphin_45x42.png
+```
+</details></tool-use>
+
+_**Agent (glm-4.7 2026-02-07 12:43:13Z)**_
+
+<think><details><summary>Thought Process</summary>
+I see - the user has `Space_65x18` but not `Space_60x18`. And they have `Ble_connected_15x15` but with capital B. Let me check the exact icon names by looking at existing code.
+</details></think>
+
+_**Agent (glm-4.7 2026-02-07 12:43:13Z)**_
+
+<tool-use data-tool-type="search" data-tool-name="Grep"><details>
+<summary>Tool use: **Grep**</summary>
+ path `./anki_remote.c` pattern `I_Space|I_Ble`
+```
+891:        canvas_draw_icon(canvas, 111, 2, &I_Ble_disconnected_15x15);
+900:            canvas_draw_icon(canvas, 0, 0, &I_Ble_connected_15x15);
+902:            canvas_draw_icon(canvas, 0, 0, &I_Ble_disconnected_15x15);
+955:        canvas_draw_icon(canvas, 2, 86, &I_Space_60x18);
+965:        canvas_draw_icon(canvas, 2, 107, &I_Space_60x18);
+```
+</details></tool-use>
+
+_**Agent (glm-4.7 2026-02-07 12:43:17Z)**_
+
+<think><details><summary>Thought Process</summary>
+I see I used `I_Space_60x18` which doesn't exist - the user has `Space_65x18`. Let me fix this and also check for the correct BLE icon name.
+</details></think>
+
+_**Agent (glm-4.7 2026-02-07 12:43:17Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+```
+The file /Users/dhruvgore/developer/flipper-zero/Anki-Remote/anki_remote.c has been updated. Here's the result of running `cat -n` on a snippet of the edited file:
+   950→        }
+   951→        hid_keynote_draw_arrow(canvas, x_3 + 11, y_2 + 8, CanvasDirectionLeftToRight);
+   952→        canvas_set_color(canvas, ColorBlack);
+   953→
+   954→        // Ok
+   955→        canvas_draw_icon(canvas, 2, 86, &I_Space_65x18);
+   956→        if(app->controller_state.ok_pressed) {
+   957→            elements_slightly_rounded_box(canvas, 5, 88, 60, 13);
+   958→            canvas_set_color(canvas, ColorWhite);
+   959→        }
+   960→        canvas_draw_icon(canvas, 11, 90, &I_Ok_btn_9x9);
+   961→        elements_multiline_text_aligned(canvas, 26, 98, AlignLeft, AlignBottom, "Space");
+   962→        canvas_set_color(canvas, ColorBlack);
+   963→
+   964→        // Back
+   965→        canvas_draw_icon(canvas, 2, 107, &I_Space_65x18);
+   966→        if(app->controller_state.back_pressed) {
+   967→            elements_slightly_rounded_box(canvas, 5, 109, 55, 13);
+   968→            canvas_set_color(canvas, ColorWhite);
+   969→        }
+```
+</details></tool-use>
+
+_**Agent (glm-4.7 2026-02-07 12:43:35Z)**_
+
+<think><details><summary>Thought Process</summary>
+I also need to update the Back button's rounded box width to 60 to match the icon width.
+</details></think>
+
+_**Agent (glm-4.7 2026-02-07 12:43:35Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+```
+The file /Users/dhruvgore/developer/flipper-zero/Anki-Remote/anki_remote.c has been updated. Here's the result of running `cat -n` on a snippet of the edited file:
+   960→        canvas_draw_icon(canvas, 11, 90, &I_Ok_btn_9x9);
+   961→        elements_multiline_text_aligned(canvas, 26, 98, AlignLeft, AlignBottom, "Space");
+   962→        canvas_set_color(canvas, ColorBlack);
+   963→
+   964→        // Back
+   965→        canvas_draw_icon(canvas, 2, 107, &I_Space_65x18);
+   966→        if(app->controller_state.back_pressed) {
+   967→            elements_slightly_rounded_box(canvas, 5, 109, 60, 13);
+   968→            canvas_set_color(canvas, ColorWhite);
+   969→        }
+   970→        canvas_draw_icon(canvas, 11, 111, &I_Pin_back_arrow_10x8);
+   971→        elements_multiline_text_aligned(canvas, 26, 119, AlignLeft, AlignBottom, "Back");
+   972→    }
+   973→}
+```
+</details></tool-use>
+
+_**Agent (glm-4.7 2026-02-07 12:43:37Z)**_
+
+<think><details><summary>Thought Process</summary>
+Now let me try building.
+</details></think>
+
+_**Agent (glm-4.7 2026-02-07 12:43:37Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Build the Flipper app
+
+`ufbt`
+```
+scons: Entering directory `/Users/dhruvgore/.ufbt/current/scripts/ufbt'
+	CC	/Users/dhruvgore/developer/flipper-zero/Anki-Remote/anki_remote.c
+	CDB	/Users/dhruvgore/developer/flipper-zero/Anki-Remote/.vscode/compile_commands.json
+	LINK	/Users/dhruvgore/.ufbt/build/anki_remote_d.elf
+	APPMETA	/Users/dhruvgore/.ufbt/build/anki_remote.fap
+	INSTALL	/Users/dhruvgore/developer/flipper-zero/Anki-Remote/dist/debug/anki_remote_d.elf
+	FAP	/Users/dhruvgore/.ufbt/build/anki_remote.fap
+	FASTFAP	/Users/dhruvgore/.ufbt/build/anki_remote.fap
+	INSTALL	/Users/dhruvgore/developer/flipper-zero/Anki-Remote/dist/anki_remote.fap
+	APPCHK	/Users/dhruvgore/.ufbt/build/anki_remote.fap
+		Target: 7, API: 87.1
+```
+</details></tool-use>
+
+_**Agent (glm-4.7 2026-02-07 12:43:42Z)**_
+
+<think><details><summary>Thought Process</summary>
+Build succeeded. Let me commit the changes.
+</details></think>
+
+_**Agent (glm-4.7 2026-02-07 12:43:42Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Commit changes
+
+`git add -A && git commit -m "Copy official Flipper hid_keynote vertical layout exactly"`
 </details></tool-use>
