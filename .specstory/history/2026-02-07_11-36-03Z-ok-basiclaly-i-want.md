@@ -13597,4 +13597,566 @@ _**Agent (glm-4.7 2026-02-07 12:36:27Z)**_
 Build and commit changes
 
 `ufbt && git add -A && git commit -m "Update portrait controller layout"`
+```
+scons: Entering directory `/Users/dhruvgore/.ufbt/current/scripts/ufbt'
+	CC	/Users/dhruvgore/developer/flipper-zero/Anki-Remote/anki_remote.c
+	CDB	/Users/dhruvgore/developer/flipper-zero/Anki-Remote/.vscode/compile_commands.json
+	LINK	/Users/dhruvgore/.ufbt/build/anki_remote_d.elf
+	APPMETA	/Users/dhruvgore/.ufbt/build/anki_remote.fap
+	INSTALL	/Users/dhruvgore/developer/flipper-zero/Anki-Remote/dist/debug/anki_remote_d.elf
+	FAP	/Users/dhruvgore/.ufbt/build/anki_remote.fap
+	FASTFAP	/Users/dhruvgore/.ufbt/build/anki_remote.fap
+	INSTALL	/Users/dhruvgore/developer/flipper-zero/Anki-Remote/dist/anki_remote.fap
+	APPCHK	/Users/dhruvgore/.ufbt/build/anki_remote.fap
+		Target: 7, API: 87.1
+[main 3784171] Update portrait controller layout
+ 2 files changed, 111 insertions(+), 43 deletions(-)
+```
+</details></tool-use>
+
+_**Agent (glm-4.7 2026-02-07 12:36:32Z)**_
+
+<think><details><summary>Thought Process</summary>
+Done. Built and committed the changes.
+</details></think>
+
+_**Agent (glm-4.7 2026-02-07 12:36:32Z)**_
+
+Done. Built and committed.
+
+---
+
+_**User (2026-02-07 12:38:53Z)**_
+
+https://github.com/flipperdevices/flipperzero-firmware/
+
+
+find out in the source code where the drawing for 'keynote vertical' is and use that for the visuals in my app
+
+---
+
+_**Agent (glm-4.7 2026-02-07 12:39:08Z)**_
+
+<think><details><summary>Thought Process</summary>
+The user wants me to find the "keynote vertical" drawing in the Flipper Zero firmware source code and use it for the visuals in their app. Let me search for this in the repository.
+</details></think>
+
+_**Agent (glm-4.7 2026-02-07 12:39:08Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="mcp__zread__search_doc"><details>
+<summary>Tool use: **mcp__zread__search_doc**</summary>
+```
+"Search results for flipperdevices/flipperzero-firmware\n\n:[1]: 快速入门\nSource: https://zread.ai/flipperdevices/flipperzero-firmware/\n<excerpt>\n<gui/gui.h>\n#include <notification/notification_messages.h>\n\ntypedef struct {\n    ViewPort* view_port;\n    Gui* gui;\n    NotificationApp* notifications;\n} HelloWorldApp;\n\nstatic void draw_callback(Canvas\n</excerpt>\n\n<excerpt>\n* canvas, void* context) {\n    UNUSED(context);\n    canvas_clear(canvas);\n    canvas_set_font(canvas, FontPrimary);\n    canvas_draw_str(canvas, 2, 10, \"Hello, Flipper!\")\n</excerpt>\n\n<excerpt>\n;\n    canvas_set_font(canvas, FontSecondary);\n    canvas_draw_str(canvas, 2, 30, \"Press Back to exit\");\n}\n\nstatic void input_callback(InputEvent* input_event, void* ctx) {\n    furi_assert(ctx);\n    HelloWorldApp\n</excerpt>\n\n---\n\n[2]: 创建您的第一个应用程序\nSource: https://zread.ai/flipperdevices/flipperzero-firmware/\n<excerpt>\n的文件，内容如下：\n\n```c\n#include <furi.h>\n#include <gui/gui.h>\n#include <input/input.h>\n\ntypedef struct {\n    FuriMessageQueue* event_queue;\n} HelloWorldApp;\n\n// 由GUI系统调用的绘图回调\nstatic void app_draw_callback(Canvas\n</excerpt>\n\n<excerpt>\n* canvas, void* ctx) {\n    UNUSED(ctx);\n    \n    // 清屏\n    canvas_clear(canvas);\n    \n    // 设置字体\n    canvas_set_font(canvas, FontPrimary);\n    \n    // 在屏幕中心绘制文本\n    canvas_draw_str_aligned(canvas, 64,\n</excerpt>\n\n<excerpt>\n**绘图API**：Canvas API提供在屏幕上绘制文本、形状和图像的函数。\n</excerpt>\n\n---\n\nTip: To understand the repository, view at: https://zread.ai/flipperdevices/flipperzero-firmware"
+```
+</details></tool-use>
+
+_**Agent (glm-4.7 2026-02-07 12:39:32Z)**_
+
+<think><details><summary>Thought Process</summary>
+That search didn't give me useful results. Let me try searching for "hid_keynote" which is what I saw in the user's code already - there's a function called `hid_keynote_draw_arrow`. I should search for that or similar HID remote drawing code.
+</details></think>
+
+_**Agent (glm-4.7 2026-02-07 12:39:32Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="mcp__zread__search_doc"><details>
+<summary>Tool use: **mcp__zread__search_doc**</summary>
+```
+"Search results for flipperdevices/flipperzero-firmware\n\n:Tip: To understand the repository, view at: https://zread.ai/flipperdevices/flipperzero-firmware"
+```
+</details></tool-use>
+
+_**Agent (glm-4.7 2026-02-07 12:39:37Z)**_
+
+<think><details><summary>Thought Process</summary>
+Let me try a different search - looking for HID remote or BLE remote code that has vertical drawing.
+</details></think>
+
+_**Agent (glm-4.7 2026-02-07 12:39:37Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="mcp__zread__get_repo_structure"><details>
+<summary>Tool use: **mcp__zread__get_repo_structure**</summary>
+```
+"Directory Structure of flipperdevices/flipperzero-firmware:\n\n<structure>\n├── ReadMe.md\n├── drivers/\n│   ├── application.fam\n│   └── subghz/\n├── examples/\n│   ├── application.fam\n│   ├── example_adc/\n│   ├── example_apps_assets/\n│   ├── example_apps_data/\n│   ├── example_ble_beacon/\n│   ├── example_custom_font/\n│   ├── example_event_loop/\n│   ├── example_images/\n│   ├── example_number_input/\n│   ├── example_plugins/\n│   ├── example_plugins_advanced/\n│   ├── example_thermo/\n│   ├── example_view_dispatcher/\n│   └── example_view_holder/\n├── main/\n│   ├── application.fam\n│   ├── archive/\n│   ├── bad_usb/\n│   ├── gpio/\n│   ├── ibutton/\n│   ├── infrared/\n│   ├── lfrfid/\n│   ├── nfc/\n│   ├── onewire/\n│   ├── subghz/\n│   └── u2f/\n├── services/\n│   ├── application.fam\n│   ├── applications.h\n│   ├── bt/\n│   ├── cli/\n│   ├── crypto/\n│   ├── desktop/\n│   ├── dialogs/\n│   ├── dolphin/\n│   ├── expansion/\n│   ├── gui/\n│   ├── input/\n│   ├── loader/\n│   ├── locale/\n│   ├── notification/\n│   ├── power/\n│   ├── region/\n│   ├── rpc/\n│   └── storage/\n├── settings/\n│   ├── about/\n│   ├── application.fam\n│   ├── bt_settings_app/\n│   ├── clock_settings/\n│   ├── desktop_settings/\n│   ├── dolphin_passport/\n│   ├── expansion_settings_app/\n│   ├── notification_settings/\n│   ├── power_settings_app/\n│   ├── storage_settings/\n│   └── system/\n└── system/\n    ├── application.fam\n    ├── hid_app/\n    ├── js_app/\n    ├── snake_game/\n    └── updater/\n</structure>\n\nTip: Only showing 3 levels of depth. Use `get_repo_structure` on a subdirectory to see deeper, or `read_file` to read content. To understand the repository, view at: https://zread.ai/flipperdevices/flipperzero-firmware"
+```
+</details></tool-use>
+
+_**Agent (glm-4.7 2026-02-07 12:39:42Z)**_
+
+<think><details><summary>Thought Process</summary>
+I see there's a `hid_app` in the system folder. Let me explore that - it likely has the HID remote drawing code including any vertical layouts.
+</details></think>
+
+_**Agent (glm-4.7 2026-02-07 12:39:42Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="mcp__zread__get_repo_structure"><details>
+<summary>Tool use: **mcp__zread__get_repo_structure**</summary>
+```
+"Directory Structure of flipperdevices/flipperzero-firmware:\n\n<structure>\n├── application.fam\n├── assets/\n│   ├── Alt_17x10.png\n│   ├── Alt_active_17x9.png\n│   ├── Arr_dwn_7x9.png\n│   ├── Arr_up_7x9.png\n│   ├── Ble_connected_15x15.png\n│   ├── Ble_disconnected_15x15.png\n│   ├── ButtonDown_7x4.png\n│   ├── ButtonF10_5x8.png\n│   ├── ButtonF11_5x8.png\n│   ├── ButtonF12_5x8.png\n│   ├── ButtonF1_5x8.png\n│   ├── ButtonF2_5x8.png\n│   ├── ButtonF3_5x8.png\n│   ├── ButtonF4_5x8.png\n│   ├── ButtonF5_5x8.png\n│   ├── ButtonF6_5x8.png\n│   ├── ButtonF7_5x8.png\n│   ├── ButtonF8_5x8.png\n│   ├── ButtonF9_5x8.png\n│   ├── ButtonLeft_4x7.png\n│   ├── ButtonRight_4x7.png\n│   ├── ButtonUp_7x4.png\n│   ├── Button_18x18.png\n│   ├── Cmd_17x10.png\n│   ├── Cmd_active_17x9.png\n│   ├── Ctrl_17x10.png\n│   ├── Ctrl_active_17x9.png\n│   ├── Del_17x10.png\n│   ├── DolphinDone_80x58.png\n│   ├── Dpad_49x46.png\n│   ├── Enter_11x7.png\n│   ├── Esc_17x10.png\n│   ├── Left_mouse_icon_9x10.png\n│   ├── Like_def_13x11.png\n│   ├── Like_pressed_17x16.png\n│   ├── Ok_btn_9x9.png\n│   ├── Ok_btn_pressed_13x12.png\n│   ├── Pin_arrow_down_7x9.png\n│   ├── Pin_arrow_left_9x7.png\n│   ├── Pin_arrow_right_9x7.png\n│   ├── Pin_arrow_up_7x9.png\n│   ├── Pin_back_arrow_10x8.png\n│   ├── Pressed_Button_13x13.png\n│   ├── Return_10x7.png\n│   ├── Right_mouse_icon_9x10.png\n│   ├── Shift_active_7x9.png\n│   ├── Shift_inactive_7x9.png\n│   ├── Space_60x18.png\n│   ├── Space_65x18.png\n│   ├── Tab_17x10.png\n│   ├── Tab_19x12.png\n│   ├── Voldwn_6x6.png\n│   ├── Volup_8x6.png\n│   ├── apostrophe_button_9x11.png\n│   ├── backslash_button_9x11.png\n│   ├── backspace_19x11.png\n│   ├── backspace_hovered_9x11.png\n│   ├── backtick_button_9x11.png\n│   ├── brace_left_button_9x11.png\n│   ├── brace_right_button_9x11.png\n│   ├── equals_button_9x11.png\n│   ├── hash_button_9x11.png\n│   ├── percent_button_9x11.png\n│   ├── quote_button_9x11.png\n│   ├── slash_button_9x11.png\n│   ├── sq_bracket_left_button_9x11.png\n│   ├── sq_bracket_right_button_9x11.png\n│   └── underscore_button_9x11.png\n├── hid.c\n├── hid.h\n├── hid_ble_10px.png\n├── hid_usb_10px.png\n├── scenes/\n│   ├── hid_scene.c\n│   ├── hid_scene.h\n│   ├── hid_scene_config.h\n│   ├── hid_scene_main.c\n│   ├── hid_scene_start.c\n│   └── hid_scene_unpair.c\n├── transport_ble.c\n├── transport_usb.c\n├── views/\n│   ├── hid_keyboard.c\n│   ├── hid_keyboard.h\n│   ├── hid_keynote.c\n│   ├── hid_keynote.h\n│   ├── hid_media.c\n│   ├── hid_media.h\n│   ├── hid_mouse.c\n│   ├── hid_mouse.h\n│   ├── hid_mouse_clicker.c\n│   ├── hid_mouse_clicker.h\n│   ├── hid_mouse_jiggler.c\n│   ├── hid_mouse_jiggler.h\n│   ├── hid_tiktok.c\n│   └── hid_tiktok.h\n└── views.h\n</structure>\n\nTip: Only showing 3 levels of depth. Use `get_repo_structure` on a subdirectory to see deeper, or `read_file` to read content. To understand the repository, view at: https://zread.ai/flipperdevices/flipperzero-firmware"
+```
+</details></tool-use>
+
+_**Agent (glm-4.7 2026-02-07 12:39:55Z)**_
+
+<think><details><summary>Thought Process</summary>
+Found it! There's a `hid_keynote.c` file. Let me read it to see the vertical drawing code.
+</details></think>
+
+_**Agent (glm-4.7 2026-02-07 12:39:55Z)**_
+
+<tool-use data-tool-type="unknown" data-tool-name="mcp__zread__read_file"><details>
+<summary>Tool use: **mcp__zread__read_file**</summary>
+```
+"File content for applications/system/hid_app/views/hid_keynote.c in flipperdevices/flipperzero-firmware.\nSource: https://github.com/flipperdevices/flipperzero-firmware/blob/master/applications/system/hid_app/views/hid_keynote.c\n\n<file_content>\n#include \"hid_keynote.h\"\n#include <gui/elements.h>\n#include \"../hid.h\"\n\n#include \"hid_icons.h\"\n\n#define TAG \"HidKeynote\"\n\nstruct HidKeynote {\n    View* view;\n    Hid* hid;\n};\n\ntypedef struct {\n    bool left_pressed;\n    bool up_pressed;\n    bool right_pressed;\n    bool down_pressed;\n    bool ok_pressed;\n    bool back_pressed;\n    bool connected;\n} HidKeynoteModel;\n\nstatic void hid_keynote_draw_arrow(Canvas* canvas, uint8_t x, uint8_t y, CanvasDirection dir) {\n    canvas_draw_triangle(canvas, x, y, 5, 3, dir);\n    if(dir == CanvasDirectionBottomToTop) {\n        canvas_draw_line(canvas, x, y + 6, x, y - 1);\n    } else if(dir == CanvasDirectionTopToBottom) {\n        canvas_draw_line(canvas, x, y - 6, x, y + 1);\n    } else if(dir == CanvasDirectionRightToLeft) {\n        canvas_draw_line(canvas, x + 6, y, x - 1, y);\n    } else if(dir == CanvasDirectionLeftToRight) {\n        canvas_draw_line(canvas, x - 6, y, x + 1, y);\n    }\n}\n\nstatic void hid_keynote_draw_callback(Canvas* canvas, void* context) {\n    furi_assert(context);\n    HidKeynoteModel* model = context;\n\n    // Header\n#ifdef HID_TRANSPORT_BLE\n    if(model->connected) {\n        canvas_draw_icon(canvas, 0, 0, &I_Ble_connected_15x15);\n    } else {\n        canvas_draw_icon(canvas, 0, 0, &I_Ble_disconnected_15x15);\n    }\n#endif\n\n    canvas_set_font(canvas, FontPrimary);\n    elements_multiline_text_aligned(canvas, 17, 3, AlignLeft, AlignTop, \"Keynote\");\n\n    canvas_draw_icon(canvas, 68, 2, &I_Pin_back_arrow_10x8);\n    canvas_set_font(canvas, FontSecondary);\n    elements_multiline_text_aligned(canvas, 127, 3, AlignRight, AlignTop, \"Hold to exit\");\n\n    // Up\n    canvas_draw_icon(canvas, 21, 24, &I_Button_18x18);\n    if(model->up_pressed) {\n        elements_slightly_rounded_box(canvas, 24, 26, 13, 13);\n        canvas_set_color(canvas, ColorWhite);\n    }\n    hid_keynote_draw_arrow(canvas, 30, 30, CanvasDirectionBottomToTop);\n    canvas_set_color(canvas, ColorBlack);\n\n    // Down\n    canvas_draw_icon(canvas, 21, 45, &I_Button_18x18);\n    if(model->down_pressed) {\n        elements_slightly_rounded_box(canvas, 24, 47, 13, 13);\n        canvas_set_color(canvas, ColorWhite);\n    }\n    hid_keynote_draw_arrow(canvas, 30, 55, CanvasDirectionTopToBottom);\n    canvas_set_color(canvas, ColorBlack);\n\n    // Left\n    canvas_draw_icon(canvas, 0, 45, &I_Button_18x18);\n    if(model->left_pressed) {\n        elements_slightly_rounded_box(canvas, 3, 47, 13, 13);\n        canvas_set_color(canvas, ColorWhite);\n    }\n    hid_keynote_draw_arrow(canvas, 7, 53, CanvasDirectionRightToLeft);\n    canvas_set_color(canvas, ColorBlack);\n\n    // Right\n    canvas_draw_icon(canvas, 42, 45, &I_Button_18x18);\n    if(model->right_pressed) {\n        elements_slightly_rounded_box(canvas, 45, 47, 13, 13);\n        canvas_set_color(canvas, ColorWhite);\n    }\n    hid_keynote_draw_arrow(canvas, 53, 53, CanvasDirectionLeftToRight);\n    canvas_set_color(canvas, ColorBlack);\n\n    // Ok\n    canvas_draw_icon(canvas, 63, 24, &I_Space_65x18);\n    if(model->ok_pressed) {\n        elements_slightly_rounded_box(canvas, 66, 26, 60, 13);\n        canvas_set_color(canvas, ColorWhite);\n    }\n    canvas_draw_icon(canvas, 74, 28, &I_Ok_btn_9x9);\n    elements_multiline_text_aligned(canvas, 91, 36, AlignLeft, AlignBottom, \"Space\");\n    canvas_set_color(canvas, ColorBlack);\n\n    // Back\n    canvas_draw_icon(canvas, 63, 45, &I_Space_65x18);\n    if(model->back_pressed) {\n        elements_slightly_rounded_box(canvas, 66, 47, 60, 13);\n        canvas_set_color(canvas, ColorWhite);\n    }\n    canvas_draw_icon(canvas, 74, 49, &I_Pin_back_arrow_10x8);\n    elements_multiline_text_aligned(canvas, 91, 57, AlignLeft, AlignBottom, \"Back\");\n}\n\nstatic void hid_keynote_draw_vertical_callback(Canvas* canvas, void* context) {\n    furi_assert(context);\n    HidKeynoteModel* model = context;\n\n    // Header\n#ifdef HID_TRANSPORT_BLE\n    if(model->connected) {\n        canvas_draw_icon(canvas, 0, 0, &I_Ble_connected_15x15);\n    } else {\n        canvas_draw_icon(canvas, 0, 0, &I_Ble_disconnected_15x15);\n    }\n    canvas_set_font(canvas, FontPrimary);\n    elements_multiline_text_aligned(canvas, 20, 3, AlignLeft, AlignTop, \"Keynote\");\n#else\n    canvas_set_font(canvas, FontPrimary);\n    elements_multiline_text_aligned(canvas, 12, 3, AlignLeft, AlignTop, \"Keynote\");\n#endif\n\n    canvas_draw_icon(canvas, 2, 18, &I_Pin_back_arrow_10x8);\n    canvas_set_font(canvas, FontSecondary);\n    elements_multiline_text_aligned(canvas, 15, 19, AlignLeft, AlignTop, \"Hold to exit\");\n\n    const uint8_t x_2 = 23;\n    const uint8_t x_1 = 2;\n    const uint8_t x_3 = 44;\n\n    const uint8_t y_1 = 44;\n    const uint8_t y_2 = 65;\n\n    // Up\n    canvas_draw_icon(canvas, x_2, y_1, &I_Button_18x18);\n    if(model->up_pressed) {\n        elements_slightly_rounded_box(canvas, x_2 + 3, y_1 + 2, 13, 13);\n        canvas_set_color(canvas, ColorWhite);\n    }\n    hid_keynote_draw_arrow(canvas, x_2 + 9, y_1 + 6, CanvasDirectionBottomToTop);\n    canvas_set_color(canvas, ColorBlack);\n\n    // Down\n    canvas_draw_icon(canvas, x_2, y_2, &I_Button_18x18);\n    if(model->down_pressed) {\n        elements_slightly_rounded_box(canvas, x_2 + 3, y_2 + 2, 13, 13);\n        canvas_set_color(canvas, ColorWhite);\n    }\n    hid_keynote_draw_arrow(canvas, x_2 + 9, y_2 + 10, CanvasDirectionTopToBottom);\n    canvas_set_color(canvas, ColorBlack);\n\n    // Left\n    canvas_draw_icon(canvas, x_1, y_2, &I_Button_18x18);\n    if(model->left_pressed) {\n        elements_slightly_rounded_box(canvas, x_1 + 3, y_2 + 2, 13, 13);\n        canvas_set_color(canvas, ColorWhite);\n    }\n    hid_keynote_draw_arrow(canvas, x_1 + 7, y_2 + 8, CanvasDirectionRightToLeft);\n    canvas_set_color(canvas, ColorBlack);\n\n    // Right\n    canvas_draw_icon(canvas, x_3, y_2, &I_Button_18x18);\n    if(model->right_pressed) {\n        elements_slightly_rounded_box(canvas, x_3 + 3, y_2 + 2, 13, 13);\n        canvas_set_color(canvas, ColorWhite);\n    }\n    hid_keynote_draw_arrow(canvas, x_3 + 11, y_2 + 8, CanvasDirectionLeftToRight);\n    canvas_set_color(canvas, ColorBlack);\n\n    // Ok\n    canvas_draw_icon(canvas, 2, 86, &I_Space_60x18);\n    if(model->ok_pressed) {\n        elements_slightly_rounded_box(canvas, 5, 88, 55, 13);\n        canvas_set_color(canvas, ColorWhite);\n    }\n    canvas_draw_icon(canvas, 11, 90, &I_Ok_btn_9x9);\n    elements_multiline_text_aligned(canvas, 26, 98, AlignLeft, AlignBottom, \"Space\");\n    canvas_set_color(canvas, ColorBlack);\n\n    // Back\n    canvas_draw_icon(canvas, 2, 107, &I_Space_60x18);\n    if(model->back_pressed) {\n        elements_slightly_rounded_box(canvas, 5, 109, 55, 13);\n        canvas_set_color(canvas, ColorWhite);\n    }\n    canvas_draw_icon(canvas, 11, 111, &I_Pin_back_arrow_10x8);\n    elements_multiline_text_aligned(canvas, 26, 119, AlignLeft, AlignBottom, \"Back\");\n}\n\nstatic void hid_keynote_process(HidKeynote* hid_keynote, InputEvent* event) {\n    with_view_model(\n        hid_keynote->view,\n        HidKeynoteModel * model,\n        {\n            if(event->type == InputTypePress) {\n                if(event->key == InputKeyUp) {\n                    model->up_pressed = true;\n                    hid_hal_keyboard_press(hid_keynote->hid, HID_KEYBOARD_UP_ARROW);\n                } else if(event->key == InputKeyDown) {\n                    model->down_pressed = true;\n                    hid_hal_keyboard_press(hid_keynote->hid, HID_KEYBOARD_DOWN_ARROW);\n                } else if(event->key == InputKeyLeft) {\n                    model->left_pressed = true;\n                    hid_hal_keyboard_press(hid_keynote->hid, HID_KEYBOARD_LEFT_ARROW);\n                } else if(event->key == InputKeyRight) {\n                    model->right_pressed = true;\n                    hid_hal_keyboard_press(hid_keynote->hid, HID_KEYBOARD_RIGHT_ARROW);\n                } else if(event->key == InputKeyOk) {\n                    model->ok_pressed = true;\n                    hid_hal_keyboard_press(hid_keynote->hid, HID_KEYBOARD_SPACEBAR);\n                } else if(event->key == InputKeyBack) {\n                    model->back_pressed = true;\n                }\n            } else if(event->type == InputTypeRelease) {\n                if(event->key == InputKeyUp) {\n                    model->up_pressed = false;\n                    hid_hal_keyboard_release(hid_keynote->hid, HID_KEYBOARD_UP_ARROW);\n                } else if(event->key == InputKeyDown) {\n                    model->down_pressed = false;\n                    hid_hal_keyboard_release(hid_keynote->hid, HID_KEYBOARD_DOWN_ARROW);\n                } else if(event->key == InputKeyLeft) {\n                    model->left_pressed = false;\n                    hid_hal_keyboard_release(hid_keynote->hid, HID_KEYBOARD_LEFT_ARROW);\n                } else if(event->key == InputKeyRight) {\n                    model->right_pressed = false;\n                    hid_hal_keyboard_release(hid_keynote->hid, HID_KEYBOARD_RIGHT_ARROW);\n                } else if(event->key == InputKeyOk) {\n                    model->ok_pressed = false;\n                    hid_hal_keyboard_release(hid_keynote->hid, HID_KEYBOARD_SPACEBAR);\n                } else if(event->key == InputKeyBack) {\n                    model->back_pressed = false;\n                }\n            } else if(event->type == InputTypeShort) {\n                if(event->key == InputKeyBack) {\n                    hid_hal_keyboard_press(hid_keynote->hid, HID_KEYBOARD_DELETE);\n                    hid_hal_keyboard_release(hid_keynote->hid, HID_KEYBOARD_DELETE);\n                    hid_hal_consumer_key_press(hid_keynote->hid, HID_CONSUMER_AC_BACK);\n                    hid_hal_consumer_key_release(hid_keynote->hid, HID_CONSUMER_AC_BACK);\n                }\n            }\n        },\n        true);\n}\n\nstatic bool hid_keynote_input_callback(InputEvent* event, void* context) {\n    furi_assert(context);\n    HidKeynote* hid_keynote = context;\n    bool consumed = false;\n\n    if(event->type == InputTypeLong && event->key == InputKeyBack) {\n        hid_hal_keyboard_release_all(hid_keynote->hid);\n    } else {\n        hid_keynote_process(hid_keynote, event);\n        consumed = true;\n    }\n\n    return consumed;\n}\n\nHidKeynote* hid_keynote_alloc(Hid* hid) {\n    HidKeynote* hid_keynote = malloc(sizeof(HidKeynote));\n    hid_keynote->view = view_alloc();\n    hid_keynote->hid = hid;\n    view_set_context(hid_keynote->view, hid_keynote);\n    view_allocate_model(hid_keynote->view, ViewModelTypeLocking, sizeof(HidKeynoteModel));\n    view_set_draw_callback(hid_keynote->view, hid_keynote_draw_callback);\n    view_set_input_callback(hid_keynote->view, hid_keynote_input_callback);\n    return hid_keynote;\n}\n\nvoid hid_keynote_free(HidKeynote* hid_keynote) {\n    furi_assert(hid_keynote);\n    view_free(hid_keynote->view);\n    free(hid_keynote);\n}\n\nView* hid_keynote_get_view(HidKeynote* hid_keynote) {\n    furi_assert(hid_keynote);\n    return hid_keynote->view;\n}\n\nvoid hid_keynote_set_connected_status(HidKeynote* hid_keynote, bool connected) {\n    furi_assert(hid_keynote);\n    with_view_model(\n        hid_keynote->view, HidKeynoteModel * model, { model->connected = connected; }, true);\n}\n\nvoid hid_keynote_set_orientation(HidKeynote* hid_keynote, bool vertical) {\n    furi_assert(hid_keynote);\n\n    if(vertical) {\n        view_set_draw_callback(hid_keynote->view, hid_keynote_draw_vertical_callback);\n        view_set_orientation(hid_keynote->view, ViewOrientationVerticalFlip);\n\n    } else {\n        view_set_draw_callback(hid_keynote->view, hid_keynote_draw_callback);\n        view_set_orientation(hid_keynote->view, ViewOrientationHorizontal);\n    }\n}\n\n</file_content>\n\nTip: To understand the repository, view at: https://zread.ai/flipperdevices/flipperzero-firmware"
+```
+</details></tool-use>
+
+_**Agent (glm-4.7 2026-02-07 12:40:02Z)**_
+
+<think><details><summary>Thought Process</summary>
+I found the vertical drawing code. The `hid_keynote_draw_vertical_callback` function shows the vertical layout. I can see the layout:
+
+- x_1 = 2 (left column - Left button)
+- x_2 = 23 (middle column - Up/Down buttons)
+- x_3 = 44 (right column - Right button)
+- y_1 = 44 (upper row - Up button)
+- y_2 = 65 (lower row - Down, Left, Right buttons)
+
+So the layout is:
+```
+    Up (x_2, y_1)
+Left (x_1, y_2)  Down (x_2, y_2)  Right (x_3, y_2)
+```
+
+This is a T-shaped d-pad layout with Up on top and Left/Down/Right on the bottom row.
+
+The user's app already has a `hid_keynote_draw_arrow` function which is the same as in the firmware. I should update their controller drawing to use this vertical layout approach.
+
+Let me read the current state of their drawing code and update it to match the official vertical layout.
+</details></think>
+
+_**Agent (glm-4.7 2026-02-07 12:40:02Z)**_
+
+Found it! The `hid_keynote_draw_vertical_callback` function has the vertical layout. Let me update your controller drawing to match this official layout:
+
+_**Agent (glm-4.7 2026-02-07 12:40:02Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./anki_remote.c`
+```
+   880→    else if(dir == CanvasDirectionRightToLeft) canvas_draw_line(canvas, x + 6, y, x - 1, y);
+   881→    else if(dir == CanvasDirectionLeftToRight) canvas_draw_line(canvas, x - 6, y, x + 1, y);
+   882→}
+   883→
+   884→static void anki_remote_scene_controller_draw_callback(Canvas* canvas, void* context) {
+   885→    AnkiRemoteApp* app = context;
+   886→    canvas_clear(canvas);
+   887→    if(!app->connected) {
+   888→        // "Waiting for Bluetooth" screen
+   889→        canvas_set_font(canvas, FontPrimary);
+   890→        canvas_draw_str(canvas, 2, 10, "BLE Remote");
+   891→        canvas_draw_icon(canvas, 111, 2, &I_Ble_disconnected_15x15);
+   892→        canvas_draw_icon(canvas, 1, 21, &I_WarningDolphin_45x42);
+   893→        canvas_set_font(canvas, FontSecondary);
+   894→        canvas_draw_str(canvas, 48, 37, "Awaiting bluetooth");
+   895→    } else {
+   896→        // Controller screen (Portrait Mode - Centered Cross)
+   897→        
+   898→        // --- Row 1: Visual Right (Physical Up) ---
+   899→        // Centered Horizontally (Phys Y), Top of Visual Screen (Phys X=Small)? 
+   900→        // No, in my previous logic, Visual Top was X=0.
+   901→        // But here we want a symmetrical cross.
+   902→        // Let's stick to the physical mapping:
+   903→        // Physical Up -> Visual Right (Arrow pointing Y=0)
+   904→        // Physical Down -> Visual Left (Arrow pointing Y=64)
+   905→        // Physical Left -> Visual Up (Arrow pointing X=0)
+   906→        // Physical Right -> Visual Down (Arrow pointing X=128)
+   907→
+   908→        // Center X (Physical) = 64. Center Y (Physical) = 32.
+   909→
+   910→        // Visual Right (Phys Up): Top of Phys Screen (Y=small). 
+   911→        // Position: X=55 (Center 64), Y=2.
+   912→        canvas_draw_icon(canvas, 55, 2, &I_Button_18x18);
+   913→        if(app->controller_state.up_pressed) {
+   914→            elements_slightly_rounded_box(canvas, 58, 4, 13, 13);
+   915→            canvas_set_color(canvas, ColorWhite);
+   916→        }
+   917→        // Arrow pointing to Y=0 (Visual Right) -> BottomToTop
+   918→        // Button Y=2, Center=11. Arrow Center=11 -> Y_arrow=8.
+   919→        hid_keynote_draw_arrow(canvas, 64, 8, CanvasDirectionBottomToTop);
+   920→        canvas_set_color(canvas, ColorBlack);
+   921→
+   922→        // --- Row 2: Visual Up (Phys Left) & Visual Down (Phys Right) ---
+   923→        // Y = 23.
+   924→        
+   925→        // Visual Up (Phys Left): Left of Phys Screen (X=small).
+   926→        // Position: X=30, Y=23.
+   927→        canvas_draw_icon(canvas, 30, 23, &I_Button_18x18);
+   928→        if(app->controller_state.left_pressed) {
+   929→            elements_slightly_rounded_box(canvas, 33, 25, 13, 13);
+   930→            canvas_set_color(canvas, ColorWhite);
+   931→        }
+   932→        // Arrow pointing to X=0 (Visual Up) -> RightToLeft
+   933→        // Button X=30, Center=39. Arrow Center=39.
+   934→        // Button Y=23, Center=32. Arrow Y=32.
+   935→        hid_keynote_draw_arrow(canvas, 37, 32, CanvasDirectionRightToLeft);
+   936→        canvas_set_color(canvas, ColorBlack);
+   937→
+   938→        // Visual Down (Phys Right): Right of Phys Screen (X=large).
+   939→        // Position: X=80, Y=23.
+   940→        canvas_draw_icon(canvas, 80, 23, &I_Button_18x18);
+   941→        if(app->controller_state.right_pressed) {
+   942→            elements_slightly_rounded_box(canvas, 83, 25, 13, 13);
+   943→            canvas_set_color(canvas, ColorWhite);
+   944→        }
+   945→        // Arrow pointing to X=128 (Visual Down) -> LeftToRight
+   946→        // Button X=80, Center=89. Arrow Center=89.
+   947→        hid_keynote_draw_arrow(canvas, 89, 32, CanvasDirectionLeftToRight);
+   948→        canvas_set_color(canvas, ColorBlack);
+   949→
+   950→        // --- Row 3: Visual Left (Phys Down) ---
+   951→        // Y = 44.
+   952→        // Position: X=55, Y=44.
+   953→        canvas_draw_icon(canvas, 55, 44, &I_Button_18x18);
+   954→        if(app->controller_state.down_pressed) {
+   955→            elements_slightly_rounded_box(canvas, 58, 46, 13, 13);
+   956→            canvas_set_color(canvas, ColorWhite);
+   957→        }
+   958→        // Arrow pointing to Y=64 (Visual Left) -> TopToBottom
+   959→        // Button Y=44, Center=53. Arrow Center=53 -> Y_arrow=53.
+```
+</details></tool-use>
+
+_**Agent (glm-4.7 2026-02-07 12:40:05Z)**_
+
+<think><details><summary>Thought Process</summary>
+Now I can see the user's current layout. Let me read more to see the OK and Back buttons as well. Then I'll replace it with the official vertical layout from the Flipper firmware.
+</details></think>
+
+_**Agent (glm-4.7 2026-02-07 12:40:05Z)**_
+
+<tool-use data-tool-type="read" data-tool-name="Read"><details>
+<summary>Tool use: **Read**</summary>
+ `./anki_remote.c`
+```
+   955→            elements_slightly_rounded_box(canvas, 58, 46, 13, 13);
+   956→            canvas_set_color(canvas, ColorWhite);
+   957→        }
+   958→        // Arrow pointing to Y=64 (Visual Left) -> TopToBottom
+   959→        // Button Y=44, Center=53. Arrow Center=53 -> Y_arrow=53.
+   960→        // Wait, TopToBottom: Tip at Y+6? No, line x, y-6 to x, y+1.
+   961→        // Triangle at x, y.
+   962→        // If dir TopToBottom (Pointing Down), triangle base at y-3?
+   963→        // Let's use the standard center calc: Y=53.
+   964→        hid_keynote_draw_arrow(canvas, 64, 53, CanvasDirectionTopToBottom);
+   965→        canvas_set_color(canvas, ColorBlack);
+   966→
+   967→        // --- Extra Buttons ---
+   968→
+   969→        // Back Button (Phys Back): Visual Top-Left (Phys X=small, Y=small?)
+   970→        // Let's put it at X=5, Y=28 (Vertically centered on the D-Pad row 2?)
+   971→        // Or X=5, Y=5.
+   972→        // Let's put it "Above" the Visual Up button (Physically Left of it).
+   973→        // X=5, Y=23.
+   974→        canvas_draw_icon(canvas, 5, 23, &I_Pin_back_arrow_10x8);
+   975→        if(app->controller_state.back_pressed) {
+   976→             // Visual feedback for back button
+   977→             elements_slightly_rounded_box(canvas, 3, 21, 14, 12);
+   978→        }
+   979→        canvas_set_color(canvas, ColorBlack);
+   980→        
+   981→        // OK Button (Phys OK): Visual Bottom-Center?
+   982→        // Let's put it at the "Bottom" (Physically Right/Bottom X=105).
+   983→        // Centered Y=32?
+   984→        canvas_draw_icon(canvas, 105, 25, &I_Ok_btn_9x9);
+   985→        if(app->controller_state.ok_pressed) {
+   986→             elements_slightly_rounded_box(canvas, 103, 23, 13, 13);
+   987→        }
+   988→        canvas_set_color(canvas, ColorBlack);
+   989→    }
+   990→}
+   991→
+   992→static void anki_remote_scene_controller_input_handler(AnkiRemoteApp* app, InputEvent* event) {
+   993→    // Back: long press to exit; short press is mapped if connected
+   994→    if(event->key == InputKeyBack) {
+```
+</details></tool-use>
+
+_**Agent (glm-4.7 2026-02-07 12:40:14Z)**_
+
+<think><details><summary>Thought Process</summary>
+Now I understand the user's current layout. They want me to replace it with the official Flipper vertical layout. Based on the official code:
+
+```c
+const uint8_t x_2 = 23;  // center column
+const uint8_t x_1 = 2;   // left column
+const uint8_t x_3 = 44;  // right column
+
+const uint8_t y_1 = 44;  // upper row
+const uint8_t y_2 = 65;  // lower row
+
+// Up at (x_2, y_1) = (23, 44)
+// Down at (x_2, y_2) = (23, 65)
+// Left at (x_1, y_2) = (2, 65)
+// Right at (x_3, y_2) = (44, 65)
+
+// Ok and Back are below at y=86 and y=107
+```
+
+This creates a T-shaped layout:
+```
+    Up
+Left Down Right
+```
+
+But wait, the Flipper screen is 128x64 pixels. y=107 would be off screen. Let me recalculate for the 64px height.
+
+Actually, looking at the code more carefully, the vertical callback is used with `ViewOrientationVerticalFlip` which means the screen is rotated. So when the device is held vertically, the coordinates make sense.
+
+For a non-rotated 128x64 screen, I need to adjust. Let me create a similar T-shaped layout that fits in 64px height.
+
+Actually, looking at the user's current code, they're already trying to do something custom. Let me just replace their drawing code with the official vertical layout logic, adjusted for 128x64.
+
+The official layout for vertical (rotated 90°):
+- x_1=2, x_2=23, x_3=44 (positions within the rotated width)
+
+
+- y_1=44, y_2=65 (these would map to x positions in non-rotated)
+
+I realize the vertical layout requires careful coordinate translation. The rotated orientation means I'll need to systematically swap x and y coordinates while maintaining the relative positioning of buttons. This involves precisely mapping each button's location to ensure the control scheme remains intuitive when the screen is rotated.
+
+The T-shaped arrangement centers around the Down button, with Up positioned above it and Left and Right buttons flanking it. This creates a logical directional control layout that feels natural to users.
+
+I'll calculate button positions relative to screen dimensions, placing controls symmetrically with specific horizontal and vertical offsets. The OK and Back buttons will occupy lower screen positions, maintaining clean spatial relationships.
+
+The layout uses precise pixel measurements: centered columns at x=2, x=23, and x=44, with vertical positioning at y=24 for the upper control and y=43 for lower controls. This ensures balanced, intuitive button placement across the screen's limited 64-pixel height.
+</details></think>
+
+_**Agent (glm-4.7 2026-02-07 12:40:28Z)**_
+
+I'll update your controller drawing to use the official Flipper vertical layout. It uses a T-shaped d-pad:
+
+_**Agent (glm-4.7 2026-02-07 12:40:28Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+```
+The file /Users/dhruvgore/developer/flipper-zero/Anki-Remote/anki_remote.c has been updated. Here's the result of running `cat -n` on a snippet of the edited file:
+   880→    else if(dir == CanvasDirectionRightToLeft) canvas_draw_line(canvas, x + 6, y, x - 1, y);
+   881→    else if(dir == CanvasDirectionLeftToRight) canvas_draw_line(canvas, x - 6, y, x + 1, y);
+   882→}
+   883→
+   884→static void anki_remote_scene_controller_draw_callback(Canvas* canvas, void* context) {
+   885→    AnkiRemoteApp* app = context;
+   886→    canvas_clear(canvas);
+   887→    if(!app->connected) {
+   888→        // "Waiting for Bluetooth" screen
+   889→        canvas_set_font(canvas, FontPrimary);
+   890→        canvas_draw_str(canvas, 2, 10, "BLE Remote");
+   891→        canvas_draw_icon(canvas, 111, 2, &I_Ble_disconnected_15x15);
+   892→        canvas_draw_icon(canvas, 1, 21, &I_WarningDolphin_45x42);
+   893→        canvas_set_font(canvas, FontSecondary);
+   894→        canvas_draw_str(canvas, 48, 37, "Awaiting bluetooth");
+   895→    } else {
+   896→        // Controller screen - Official Flipper vertical T-layout style
+   897→        // Header with back icon and preset name
+   898→        canvas_draw_icon(canvas, 2, 2, &I_Pin_back_arrow_10x8);
+   899→        canvas_set_font(canvas, FontSecondary);
+   900→        elements_multiline_text_aligned(canvas, 15, 3, AlignLeft, AlignTop, "Hold to exit");
+   901→
+   902→        // Show preset name
+   903→        char title_buf[32];
+   904→        snprintf(title_buf, sizeof(title_buf), "%s", app->presets[app->active_preset].name);
+   905→        if(strlen(title_buf) > 10) title_buf[10] = '\0';
+   906→        elements_multiline_text_aligned(canvas, 127, 3, AlignRight, AlignTop, title_buf);
+   907→
+   908→        // T-shaped d-pad layout (from official Flipper firmware)
+   909→        const uint8_t x_left = 2;
+   910→        const uint8_t x_center = 23;
+   911→        const uint8_t x_right = 44;
+   912→        const uint8_t y_upper = 20;
+   913→        const uint8_t y_lower = 39;
+   914→
+   915→        // Up button (top of T)
+   916→        canvas_draw_icon(canvas, x_center, y_upper, &I_Button_18x18);
+   917→        if(app->controller_state.up_pressed) {
+   918→            elements_slightly_rounded_box(canvas, x_center + 3, y_upper + 2, 13, 13);
+   919→            canvas_set_color(canvas, ColorWhite);
+   920→        }
+   921→        hid_keynote_draw_arrow(canvas, x_center + 9, y_upper + 6, CanvasDirectionBottomToTop);
+   922→        canvas_set_color(canvas, ColorBlack);
+   923→
+   924→        // Left button (left of bottom row)
+   925→        canvas_draw_icon(canvas, x_left, y_lower, &I_Button_18x18);
+   926→        if(app->controller_state.left_pressed) {
+   927→            elements_slightly_rounded_box(canvas, x_left + 3, y_lower + 2, 13, 13);
+   928→            canvas_set_color(canvas, ColorWhite);
+   929→        }
+   930→        hid_keynote_draw_arrow(canvas, x_left + 7, y_lower + 8, CanvasDirectionRightToLeft);
+   931→        canvas_set_color(canvas, ColorBlack);
+   932→
+   933→        // Down button (center of bottom row)
+   934→        canvas_draw_icon(canvas, x_center, y_lower, &I_Button_18x18);
+   935→        if(app->controller_state.down_pressed) {
+   936→            elements_slightly_rounded_box(canvas, x_center + 3, y_lower + 2, 13, 13);
+   937→            canvas_set_color(canvas, ColorWhite);
+   938→        }
+   939→        hid_keynote_draw_arrow(canvas, x_center + 9, y_lower + 10, CanvasDirectionTopToBottom);
+   940→        canvas_set_color(canvas, ColorBlack);
+   941→
+   942→        // Right button (right of bottom row)
+   943→        canvas_draw_icon(canvas, x_right, y_lower, &I_Button_18x18);
+   944→        if(app->controller_state.right_pressed) {
+   945→            elements_slightly_rounded_box(canvas, x_right + 3, y_lower + 2, 13, 13);
+   946→            canvas_set_color(canvas, ColorWhite);
+   947→        }
+   948→        hid_keynote_draw_arrow(canvas, x_right + 11, y_lower + 8, CanvasDirectionLeftToRight);
+   949→        canvas_set_color(canvas, ColorBlack);
+   950→
+   951→        // OK button
+   952→        canvas_draw_icon(canvas, 70, 15, &I_Space_54x18);
+   953→        if(app->controller_state.ok_pressed) {
+   954→            elements_slightly_rounded_box(canvas, 73, 17, 48, 13);
+   955→            canvas_set_color(canvas, ColorWhite);
+   956→        }
+   957→        canvas_draw_icon(canvas, 76, 19, &I_Ok_btn_9x9);
+   958→        elements_multiline_text_aligned(canvas, 91, 27, AlignLeft, AlignBottom, "OK");
+   959→        canvas_set_color(canvas, ColorBlack);
+   960→
+   961→        // Back button
+   962→        canvas_draw_icon(canvas, 70, 39, &I_Space_54x18);
+   963→        if(app->controller_state.back_pressed) {
+   964→            elements_slightly_rounded_box(canvas, 73, 41, 48, 13);
+   965→            canvas_set_color(canvas, ColorWhite);
+   966→        }
+   967→        canvas_draw_icon(canvas, 76, 43, &I_Pin_back_arrow_10x8);
+   968→        elements_multiline_text_aligned(canvas, 91, 51, AlignLeft, AlignBottom, "Back");
+   969→        canvas_set_color(canvas, ColorBlack);
+   970→    }
+   971→}
+   972→
+   973→static void anki_remote_scene_controller_input_handler(AnkiRemoteApp* app, InputEvent* event) {
+   974→    // Back: long press to exit; short press is mapped if connected
+   975→    if(event->key == InputKeyBack) {
+```
+</details></tool-use>
+
+_**Agent (glm-4.7 2026-02-07 12:40:30Z)**_
+
+<think><details><summary>Thought Process</summary>
+Now let me build and commit.
+</details></think>
+
+_**Agent (glm-4.7 2026-02-07 12:40:30Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Build and commit T-layout changes
+
+```bash
+ufbt && git add -A && git commit -m "Use official Flipper T-layout for controller
+
+- Based on hid_keynote_draw_vertical_callback from official firmware
+- T-shaped d-pad: Up on top, Left/Down/Right on bottom row
+- OK and Back buttons on right side"
+```
+```
+Exit code 2
+/Users/dhruvgore/developer/flipper-zero/Anki-Remote/anki_remote.c: In function 'anki_remote_scene_controller_draw_callback':
+/Users/dhruvgore/developer/flipper-zero/Anki-Remote/anki_remote.c:952:43: error: 'I_Space_54x18' undeclared (first use in this function); did you mean 'I_Space_65x18'?
+  952 |         canvas_draw_icon(canvas, 70, 15, &I_Space_54x18);
+      |                                           ^~~~~~~~~~~~~
+      |                                           I_Space_65x18
+/Users/dhruvgore/developer/flipper-zero/Anki-Remote/anki_remote.c:952:43: note: each undeclared identifier is reported only once for each function it appears in
+scons: *** [/Users/dhruvgore/.ufbt/build/anki_remote/anki_remote.o] Error 1
+
+scons: Entering directory `/Users/dhruvgore/.ufbt/current/scripts/ufbt'
+	CC	/Users/dhruvgore/developer/flipper-zero/Anki-Remote/anki_remote.c
+	CDB	/Users/dhruvgore/developer/flipper-zero/Anki-Remote/.vscode/compile_commands.json
+```
+</details></tool-use>
+
+_**Agent (glm-4.7 2026-02-07 12:40:37Z)**_
+
+<think><details><summary>Thought Process</summary>
+I used the wrong icon name. Let me fix it - it should be `I_Space_65x18` or just use `I_Space_60x18` from the official code. Looking at the user's icons, they have `I_Space_65x18`.
+</details></think>
+
+_**Agent (glm-4.7 2026-02-07 12:40:37Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+```
+The file /Users/dhruvgore/developer/flipper-zero/Anki-Remote/anki_remote.c has been updated. Here's the result of running `cat -n` on a snippet of the edited file:
+   947→        }
+   948→        hid_keynote_draw_arrow(canvas, x_right + 11, y_lower + 8, CanvasDirectionLeftToRight);
+   949→        canvas_set_color(canvas, ColorBlack);
+   950→
+   951→        // OK button
+   952→        canvas_draw_icon(canvas, 70, 15, &I_Space_65x18);
+   953→        if(app->controller_state.ok_pressed) {
+   954→            elements_slightly_rounded_box(canvas, 73, 17, 60, 13);
+   955→            canvas_set_color(canvas, ColorWhite);
+   956→        }
+   957→        canvas_draw_icon(canvas, 76, 19, &I_Ok_btn_9x9);
+   958→        elements_multiline_text_aligned(canvas, 91, 27, AlignLeft, AlignBottom, "OK");
+   959→        canvas_set_color(canvas, ColorBlack);
+   960→
+   961→        // Back button
+   962→        canvas_draw_icon(canvas, 70, 39, &I_Space_65x18);
+   963→        if(app->controller_state.back_pressed) {
+   964→            elements_slightly_rounded_box(canvas, 73, 41, 48, 13);
+   965→            canvas_set_color(canvas, ColorWhite);
+   966→        }
+```
+</details></tool-use>
+
+_**Agent (glm-4.7 2026-02-07 12:40:39Z)**_
+
+<think><details><summary>Thought Process</summary>
+Now I also need to fix the Back button's rounded box width to match the 65 width.
+</details></think>
+
+_**Agent (glm-4.7 2026-02-07 12:40:39Z)**_
+
+<tool-use data-tool-type="write" data-tool-name="Edit"><details>
+<summary>Tool use: **Edit**</summary>
+```
+The file /Users/dhruvgore/developer/flipper-zero/Anki-Remote/anki_remote.c has been updated. Here's the result of running `cat -n` on a snippet of the edited file:
+   957→        canvas_draw_icon(canvas, 76, 19, &I_Ok_btn_9x9);
+   958→        elements_multiline_text_aligned(canvas, 91, 27, AlignLeft, AlignBottom, "OK");
+   959→        canvas_set_color(canvas, ColorBlack);
+   960→
+   961→        // Back button
+   962→        canvas_draw_icon(canvas, 70, 39, &I_Space_65x18);
+   963→        if(app->controller_state.back_pressed) {
+   964→            elements_slightly_rounded_box(canvas, 73, 41, 60, 13);
+   965→            canvas_set_color(canvas, ColorWhite);
+   966→        }
+   967→        canvas_draw_icon(canvas, 76, 43, &I_Pin_back_arrow_10x8);
+   968→        elements_multiline_text_aligned(canvas, 91, 51, AlignLeft, AlignBottom, "Back");
+   969→        canvas_set_color(canvas, ColorBlack);
+   970→    }
+```
+</details></tool-use>
+
+_**Agent (glm-4.7 2026-02-07 12:40:53Z)**_
+
+<think><details><summary>Thought Process</summary>
+Now let me build and commit.
+</details></think>
+
+_**Agent (glm-4.7 2026-02-07 12:40:53Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Build and commit T-layout changes
+
+```bash
+ufbt && git add -A && git commit -m "Use official Flipper T-layout for controller
+
+- Based on hid_keynote_draw_vertical_callback from official firmware
+- T-shaped d-pad: Up on top, Left/Down/Right on bottom row
+- OK and Back buttons on right side"
+```
 </details></tool-use>
