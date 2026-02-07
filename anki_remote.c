@@ -956,8 +956,8 @@ static void anki_remote_view_controller_draw(Canvas* canvas, void* context) {
         hid_keynote_draw_arrow(canvas, x_3 + 11, y_2 + 8, CanvasDirectionLeftToRight);
         canvas_set_color(canvas, ColorBlack);
 
-        // Ok (wide button) - keep inside canvas height
-        const uint8_t ok_y = (ch >= 42) ? (uint8_t)(ch - 42) : 0;
+        // Ok (wide button) - exact Keynote Vertical position
+        const uint8_t ok_y = 86;
         canvas_draw_icon(canvas, 2, ok_y, &I_Space_60x18);
         if(app->controller_state.ok_pressed) {
             elements_slightly_rounded_box(canvas, 5, ok_y + 2, 55, 13);
@@ -967,8 +967,8 @@ static void anki_remote_view_controller_draw(Canvas* canvas, void* context) {
         elements_multiline_text_aligned(canvas, 26, ok_y + 12, AlignLeft, AlignBottom, "Space");
         canvas_set_color(canvas, ColorBlack);
 
-        // Back (wide button) - keep inside canvas height
-        const uint8_t back_y = (ch >= 21) ? (uint8_t)(ch - 21) : ok_y;
+        // Back (wide button) - exact Keynote Vertical position
+        const uint8_t back_y = 107;
         canvas_draw_icon(canvas, 2, back_y, &I_Space_60x18);
         if(app->controller_state.back_pressed) {
             elements_slightly_rounded_box(canvas, 5, back_y + 2, 55, 13);
