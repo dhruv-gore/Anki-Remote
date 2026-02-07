@@ -1854,13 +1854,23 @@ static bool anki_remote_exit_callback(void* context) {
     return false;  // Return false to exit the app
 }
 
+static void anki_remote_stop_controller_bt(AnkiRemoteApp* app) {
+    if(!app || !app->bt) return;
+    if(!app->ble_hid_profile) return;
+
+    bt_set_status_changed_callback(app->bt, NULL, NULL);
+    furi_hal_bt_stop_advertising();
+    bt_disconnect(app->bt);
+    furi_delay_ms(200);
+    bt_profile_restore_default(app->bt);
+    app->ble_hid_profile = NULL;
+    app->connected = false;
+}
+
 static void anki_remote_switch_to_view(AnkiRemoteApp* app, AnkiRemoteView view) {
     // Clean up controller when leaving it
     if(app->current_scene == SceneController && view != AnkiRemoteViewController) {
-        bt_disconnect(app->bt);
-        furi_delay_ms(200);
-        bt_set_status_changed_callback(app->bt, NULL, NULL);
-        bt_profile_restore_default(app->bt);
+        anki_remote_stop_controller_bt(app);
     }
 
     // Initialize scene when entering
@@ -2010,12 +2020,7 @@ static void anki_remote_app_free(AnkiRemoteApp* app) {
     furi_assert(app);
 
     // Clean up controller if active
-    if(app->current_scene == SceneController) {
-        bt_disconnect(app->bt);
-        furi_delay_ms(200);
-        bt_set_status_changed_callback(app->bt, NULL, NULL);
-        bt_profile_restore_default(app->bt);
-    }
+    anki_remote_stop_controller_bt(app);
 
     // Free Views
     for(uint32_t i = 0; i < 5; i++) {
