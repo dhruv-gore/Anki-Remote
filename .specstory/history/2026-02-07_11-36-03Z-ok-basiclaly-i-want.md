@@ -20407,3 +20407,35 @@ Build successful. The .fap file is ready at dist/anki_remote.fap.
 _**Agent (glm-4.7 2026-02-07 20:36:26Z)**_
 
 Done. `dist/anki_remote.fap` is ready to copy to your Flipper.
+
+---
+
+_**User (2026-02-07 20:53:09Z)**_
+
+commit and build
+
+---
+
+_**Agent (glm-4.7 2026-02-07 20:53:16Z)**_
+
+<think><details><summary>Thought Process</summary>
+The user wants me to commit the changes and build.
+</details></think>
+
+_**Agent (glm-4.7 2026-02-07 20:53:16Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Commit and build the Flipper app
+
+```bash
+git add -A && git commit -m "$(cat <<'EOF'
+Remove extra line from arrow drawing function
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+EOF
+)" && ufbt 2>&1
+```
+</details></tool-use>

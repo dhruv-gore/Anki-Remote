@@ -6359,4 +6359,105 @@ _**Agent (glm-4.7 2026-02-07 20:49:03Z)**_
 Check git status before commit
 
 `git add -A && git status`
+```
+## main...origin/main [ahead 13]
+M  .specstory/history/2026-02-07_11-36-03Z-ok-basiclaly-i-want.md
+A  .specstory/history/2026-02-07_20-26-34Z-basically-for-the-gui.md
+A  .specstory/history/2026-02-07_20-26-34Z-gemini-session.md
+A  .specstory/history/2026-02-07_20-39-56Z-ok-basically-a-level.md
+M  anki_remote.c
+```
 </details></tool-use>
+
+_**Agent (glm-4.7 2026-02-07 20:49:08Z)**_
+
+<think><details><summary>Thought Process</summary>
+Let me commit these changes with a descriptive message.
+</details></think>
+
+_**Agent (glm-4.7 2026-02-07 20:49:08Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+Commit the View system refactor
+
+```bash
+git commit -m "$(cat <<'EOF'
+Refactor: Replace ViewPort with View system for proper orientation support
+
+- Migrated from ViewPort to ViewDispatcher/View architecture
+- Controller View now uses ViewOrientationVerticalFlip for true Keynote Vertical UI
+- Each scene now has its own View with dedicated draw/input callbacks
+- TextInput now integrated into main ViewDispatcher instead of separate instance
+- Simplified app lifecycle using view_dispatcher_run()
+
+This enables the Controller UI to use the exact same Keynote Vertical layout
+from Flipper Zero's stock HID app, with hardware-accelerated 180° rotation.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+EOF
+)"
+```
+```
+[main 4ef4f2a] Refactor: Replace ViewPort with View system for proper orientation support
+ 5 files changed, 11591 insertions(+), 180 deletions(-)
+ create mode 100644 .specstory/history/2026-02-07_20-26-34Z-basically-for-the-gui.md
+ create mode 100644 .specstory/history/2026-02-07_20-26-34Z-gemini-session.md
+ create mode 100644 .specstory/history/2026-02-07_20-39-56Z-ok-basically-a-level.md
+```
+</details></tool-use>
+
+_**Agent (glm-4.7 2026-02-07 20:49:12Z)**_
+
+<think><details><summary>Thought Process</summary>
+The commit was successful. Let me verify the build output file exists and provide a summary to the user.
+</details></think>
+
+_**Agent (glm-4.7 2026-02-07 20:49:12Z)**_
+
+<tool-use data-tool-type="shell" data-tool-name="Bash"><details>
+<summary>Tool use: **Bash**</summary>
+List built artifacts
+
+`ls -la /Users/dhruvgore/developer/flipper-zero/Anki-Remote/dist/`
+```
+drwxr-xr-x@   - dhruvgore  8 Feb 07:48 debug
+.rw-r--r--@ 40k dhruvgore  8 Feb 07:48 anki_remote.fap
+```
+</details></tool-use>
+
+_**Agent (glm-4.7 2026-02-07 20:49:14Z)**_
+
+<think><details><summary>Thought Process</summary>
+Everything is complete. Let me provide a summary to the user.
+</details></think>
+
+_**Agent (glm-4.7 2026-02-07 20:49:18Z)**_
+
+Done! Here's what I implemented:
+
+**Summary of Changes:**
+
+1. **Refactored from ViewPort to View system** - The app now uses `ViewDispatcher` and individual `View` objects for each scene (Menu, Controller, PresetManager, PresetEditMenu, KeyPicker)
+
+2. **Controller View now has `ViewOrientationVerticalFlip`** - This is the key change that enables the true Flipper Zero Keynote Vertical UI. The screen is now hardware-rotated 180°, just like in the stock firmware.
+
+3. **Each View has its own callbacks** - Instead of routing through a single draw/input handler, each View has its own draw and input callback that returns `bool` (View pattern)
+
+4. **Simplified TextInput** - The rename dialog now uses the main ViewDispatcher instead of creating a temporary one
+
+**Key Code Change (anki_remote.c:1871-1877):**
+```c
+// Controller View - with VERTICAL FLIP orientation for Keynote layout!
+app->views[AnkiRemoteViewController] = view_alloc();
+view_set_context(app->views[AnkiRemoteViewController], app);
+view_set_draw_callback(app->views[AnkiRemoteViewController], anki_remote_view_controller_draw);
+view_set_input_callback(app->views[AnkiRemoteViewController], anki_remote_view_controller_input);
+view_set_orientation(app->views[AnkiRemoteViewController], ViewOrientationVerticalFlip);  // <-- THE KEY LINE
+```
+
+**Output:** `dist/anki_remote.fap` (40KB)
+
+The Controller UI should now look exactly like the Flipper Zero's stock Keynote Vertical layout because it uses the same hardware rotation feature.
