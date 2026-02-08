@@ -1149,7 +1149,7 @@ static bool anki_remote_view_controller_input(InputEvent* event, void* context) 
         return true;
     }
 
-    // Handle press event - just update visual state, don't send key yet
+    // Handle press event - update visual state
     if(event->type == InputTypePress) {
         switch(event->key) {
         case InputKeyUp:
@@ -1179,6 +1179,7 @@ static bool anki_remote_view_controller_input(InputEvent* event, void* context) 
         default:
             break;
         }
+        view_commit_model(app->views[AnkiRemoteViewController], true);
         return true;
     }
 
@@ -1253,6 +1254,7 @@ static bool anki_remote_view_controller_input(InputEvent* event, void* context) 
         // Reset the long_sent flag and mapping
         if(long_sent_ptr) *long_sent_ptr = false;
         if(long_mapping_ptr) long_mapping_ptr->long_keycode = 0;
+        view_commit_model(app->views[AnkiRemoteViewController], true);
     }
     return true;
 }
