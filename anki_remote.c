@@ -876,11 +876,14 @@ static bool anki_remote_view_menu_input(InputEvent* event, void* context) {
     AnkiRemoteApp* app = context;
     if(event->type != InputTypeShort && event->type != InputTypeRepeat) return false;
 
+    bool updated = false;
     if(event->key == InputKeyUp) {
         app->menu_state.selected_item =
             (app->menu_state.selected_item + MENU_OPTIONS_COUNT - 1) % MENU_OPTIONS_COUNT;
+        updated = true;
     } else if(event->key == InputKeyDown) {
         app->menu_state.selected_item = (app->menu_state.selected_item + 1) % MENU_OPTIONS_COUNT;
+        updated = true;
     } else if(event->key == InputKeyOk) {
         if(app->menu_state.selected_item == 0) {
             anki_remote_switch_to_view(app, AnkiRemoteViewController); // Start
@@ -891,6 +894,9 @@ static bool anki_remote_view_menu_input(InputEvent* event, void* context) {
         }
     } else if(event->key == InputKeyBack && event->type == InputTypeShort) {
         view_dispatcher_stop(app->view_dispatcher);
+    }
+    if(updated) {
+        view_commit_model(app->views[AnkiRemoteViewMenu], true);
     }
     return true;
 }
