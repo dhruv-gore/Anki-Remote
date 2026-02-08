@@ -1892,9 +1892,9 @@ static void anki_remote_view_credits_draw(Canvas* canvas, void* context) {
     canvas_set_font(canvas, FontPrimary);
     canvas_draw_str(canvas, 2, 10, "Credits");
     canvas_set_font(canvas, FontSecondary);
-    canvas_draw_str(canvas, 2, 26, "Blue5GD - created original remote");
+    canvas_draw_str(canvas, 2, 26, "Blue5GD - created original");
     canvas_draw_str(canvas, 2, 38, "dgore - my version");
-    canvas_draw_str(canvas, 2, 50, "Checkout my blog at drgo.re/blog !!");
+    canvas_draw_str(canvas, 2, 50, "Blog at drgo.re/blog !");
     canvas_draw_icon(canvas, 2, 56, &I_Pin_back_arrow_10x8);
     canvas_draw_str(canvas, 15, 62, "Back");
 }
