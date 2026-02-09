@@ -1,4 +1,8 @@
-# What does Anki-Remote do?
+# Anki-Remote
+
+This is a fork of [Blue5GD/Anki-Remote](https://github.com/Blue5GD/Anki-Remote) by [dhruv-gore](https://github.com/dhruv-gore).
+
+## What does Anki-Remote do?
 
 It lets you assign any keyboard key to each button on your Flipper Zero and use it as a BLE (Bluetooth Low Energy) remote. Key mappings are saved to the SD card inside the apps_data folder.
 
@@ -14,7 +18,17 @@ The purpose I originally had in mind for this app was to be used as a remote for
 
 The current HID keyboard in the BT remote app is limited for this use case because it takes a long time to navigate to a different button, and you have to be looking at the Flipper's screen at all times to see which key you have selected.
 
+## Changes in This Fork
+
+This version includes several enhancements over the original:
+- **Preset Support** - Create, edit, switch between, rename, and delete key-mapping presets
+- **Custom Defaults** - Set your own default key mappings
+- **Long Press Support** - Assign secondary actions to long button presses
+- **Vertical UI** - Redesigned vertical controller layout for better usability
+
 ## Credits & References
+
+**Original Project:** [Blue5GD/Anki-Remote](https://github.com/Blue5GD/Anki-Remote)
 
 The following projects were used or referenced to help me make my app:
 - [Flipper Zero's Official HID](https://github.com/flipperdevices/flipperzero-firmware/tree/dev/applications/system/hid_app) keyboard logic, core functionality, most images, and the remote screen layout.
