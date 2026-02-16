@@ -1398,7 +1398,7 @@ static bool anki_remote_view_preset_manager_input(InputEvent* event, void* conte
             if(app->preset_count < MAX_PRESETS) {
                 uint8_t new_idx = app->preset_count;
                 app->presets[new_idx] = app->presets[app->active_preset];
-                char temp_name[PRESET_NAME_MAX_LEN + 1];
+                char temp_name[64];
                 snprintf(
                     temp_name,
                     sizeof(temp_name),
