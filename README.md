@@ -1,6 +1,7 @@
 # Anki-Remote
-
 This is a fork of [Blue5GD/Anki-Remote](https://github.com/Blue5GD/Anki-Remote) by [dhruv-gore](https://github.com/dhruv-gore).
+
+Check out my [blog post here!](https://drgore.substack.com/p/using-a-flipper-zero-as-an-anki-remote)
 
 ## What does Anki-Remote do?
 
