@@ -22,10 +22,9 @@ The current HID keyboard in the BT remote app is limited for this use case becau
 ## Changes in This Fork
 
 This version includes several enhancements over the original:
-- **Preset Support** - Create, edit, switch between, rename, and delete key-mapping presets
-- **Custom Defaults** - Set your own default key mappings
 - **Long Press Support** - Assign secondary actions to long button presses
 - **Vertical UI** - Redesigned vertical controller layout for better usability
+- **Save as Profile Action** - Quickly duplicate the active preset as a new preset
 
 ## Credits & References
 
